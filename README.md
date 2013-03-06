@@ -1,0 +1,4 @@
+minino
+======
+
+an Erlang miniframework
