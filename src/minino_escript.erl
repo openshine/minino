@@ -34,7 +34,8 @@ main(Args) ->
 		ok -> ok;
 		notavailable -> usage(Commands)
 	    end;
-	false -> usage(Commands)
+	false ->
+	    usage(Commands)
     end.
 
 
@@ -46,7 +47,7 @@ is_command([Command|_], {AvailableCommnads, _}) ->
 	
 is_command_loop(_Command, []) -> 
     false;
-is_command_loop(Command, [{Command, _}|_]) -> 
+is_command_loop(Command, [{Command, _, _}|_]) -> 
     true;
 is_command_loop(Command, [_Head|Commands]) -> 
     is_command_loop(Command, Commands). 
@@ -84,7 +85,7 @@ usage({AvailableCommands, NoAvailableCommands}) ->
 	NoAvailableCommands ->
 	    io:format("~n"),
 	    io:format("no app was created yet. Please create one~n"),
-	    io:format("No available commands. They will be available after app is created~n~n"),
+	    io:format("These commands will be available after app is created~n~n"),
 	    print_commands(NoAvailableCommands)
     end.
 
@@ -95,5 +96,74 @@ print_commands(Commands) ->
       end,
       Commands).
 
-command(_CommandsArgs)->
-    notavailable.
+
+command(CommandArgs)->
+    case CommandArgs of
+	["create-app",[$i,$d,$=|AppName]] ->
+	    create_app(AppName);
+	_ -> notavailable
+    end.
+
+
+
+
+create_app(AppName) ->
+    io:format("app ~s created.~n", [AppName]),
+    
+     %% copy rebar bin
+    case filelib:is_regular("rebar") of
+    	true -> 
+	    ignore;
+    	false ->
+	    RebarBin = get_bin("rebar"),
+	    file:write_file("rebar", RebarBin),
+	    os:cmd("chmod 0755 rebar")
+	    
+     end,
+     %% create rebar.config
+    case filelib:is_regular("rebar.config") of
+    	true -> 
+	    ignore;
+    	false ->
+	    RConfBin = get_template("template.rebar.config"),
+	    file:write_file("rebar.config", RConfBin)
+    end,
+
+    %%create app
+    AppFileName = AppName ++ ".erl",
+    case filelib:is_regular(AppFileName) of
+	true -> 
+	    ignore;
+	false ->
+	    AppBin = get_template("template.application.erl"),
+	    AppCtx = dict:from_list([{module, AppName}]),
+	    AppStr = render(binary_to_list(AppBin), AppCtx),
+	    AppFileName = AppName ++ ".erl",
+	    file:write_file(AppFileName, list_to_binary(AppStr))
+    end.
+
+    
+get_template(Template) ->
+    FileName = filename:join(["priv", "templates", Template]),
+    get_bin(FileName).
+
+get_bin(FileName) ->
+    {ok, PropList} = escript:extract("minino", []),
+    Archive = proplists:get_value(archive, PropList),
+    {ok, [{FileName,Bin}]} = 
+	zip:foldl(
+	  fun(FileInArchive, _GetInfo, GetBin, Acc) ->
+		  case FileInArchive of
+		      FileName -> [{FileInArchive, GetBin()}|Acc];
+		      _ -> Acc
+		  end		      
+	  end,
+	  [],
+	  {"minino", Archive}),
+    Bin.
+
+render(Bin, Context) ->
+    ReOpts = [global, {return, list}],
+    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
+    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
+    mustache:render(Str1, Context).
