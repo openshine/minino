@@ -14,10 +14,7 @@
 	[
 	 %%{Name::string(), Help()::string(), Available:: always | appcreated
 	 {"create-app", "create a new app; create-app id=myapp", always},
-	 {"build", "build minino", appcreated},
-	 {"clean", "clean minino", appcreated},
-	 {"start", "start minino", appcreated},
-	 {"stop", "stop minino", appcreated}
+	 {"start", "start minino", appcreated}
 	]).
 
 %% API
@@ -54,7 +51,7 @@ is_command_loop(Command, [_Head|Commands]) ->
 
 %% noapp | appcreated
 get_status()->
-    case filelib:wildcard("*.erl") of
+    case filelib:wildcard(filename:join("src", "*.erl")) of
 	[] -> noapp;
 	_ -> appcreated
     end.
@@ -101,6 +98,9 @@ command(CommandArgs)->
     case CommandArgs of
 	["create-app",[$i,$d,$=|AppName]] ->
 	    create_app(AppName);
+	["start"] ->
+	    ok = minino:start(),
+	    timer:sleep(infinity);
 	_ -> notavailable
     end.
 
@@ -108,44 +108,67 @@ command(CommandArgs)->
 
 
 create_app(AppName) ->
-    io:format("app ~s created.~n", [AppName]),
-    
-     %% copy rebar bin
+    io:format("~s app created.~n", [AppName]),
+
+    %% copy rebar bin
     case filelib:is_regular("rebar") of
     	true -> 
-	    ignore;
+    	    ignore;
     	false ->
-	    RebarBin = get_bin("rebar"),
-	    file:write_file("rebar", RebarBin),
-	    os:cmd("chmod 0755 rebar")
-	    
-     end,
-     %% create rebar.config
+    	    RebarBin = get_bin("rebar"),
+    	    file:write_file("rebar", RebarBin),
+    	    os:cmd("chmod 0755 rebar")
+    end,
+
+    %% create rebar.config
     case filelib:is_regular("rebar.config") of
     	true -> 
 	    ignore;
     	false ->
-	    RConfBin = get_template("template.rebar.config"),
+	    RConfBin = get_bin("template.rebar.config"),
 	    file:write_file("rebar.config", RConfBin)
     end,
 
     %%create app
-    AppFileName = AppName ++ ".erl",
+    AppFileName = filename:join(["src", AppName ++ ".erl"]),
     case filelib:is_regular(AppFileName) of
 	true -> 
 	    ignore;
 	false ->
-	    AppBin = get_template("template.application.erl"),
-	    AppCtx = dict:from_list([{module, AppName}]),
+	    AppBin = get_bin("template.application.erl"),
+	    AppCtx = dict:from_list([{application, AppName}]),
 	    AppStr = render(binary_to_list(AppBin), AppCtx),
-	    AppFileName = AppName ++ ".erl",
+	    filelib:ensure_dir(AppFileName),
 	    file:write_file(AppFileName, list_to_binary(AppStr))
-    end.
+    end,
 
-    
-get_template(Template) ->
-    FileName = filename:join(["priv", "templates", Template]),
-    get_bin(FileName).
+    %%create app.src
+    AppSrcFileName = filename:join(["src", AppName ++ ".app.src"]),
+    case filelib:is_regular(AppSrcFileName) of
+	true -> 
+	    ignore;
+	false ->
+	    AppSrcBin = get_bin("template.application.app.src"),
+	    AppSrcCtx = dict:from_list([{application, AppName}]),
+	    AppSrcStr = render(binary_to_list(AppSrcBin), AppSrcCtx),
+	    filelib:ensure_dir(AppSrcFileName),
+	    file:write_file(AppSrcFileName, list_to_binary(AppSrcStr))
+    end,
+
+    %% create settings.cfg
+    SettingsFileName = filename:join(["priv", "settings.cfg"]),
+    case filelib:is_regular(SettingsFileName) of
+	true -> 
+	    ignore;
+	false ->
+	    SetBin = get_bin("template.settings.cfg"),
+	    SetCtx = dict:from_list([{application, AppName}]),
+	    SetStr = render(binary_to_list(SetBin), SetCtx),
+	    filelib:ensure_dir(SettingsFileName),
+	    file:write_file(SettingsFileName, list_to_binary(SetStr))
+    end,
+
+    ok.
 
 get_bin(FileName) ->
     {ok, PropList} = escript:extract("minino", []),
@@ -167,3 +190,4 @@ render(Bin, Context) ->
     Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
     Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
     mustache:render(Str1, Context).
+

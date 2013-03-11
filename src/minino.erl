@@ -18,7 +18,11 @@ main(Args) ->
     minino_escript:main(Args).
 
 start()->
-    application:start(?MODULE).
-
+    case  application:start(?MODULE) of
+	ok-> ok;
+	{error,{already_started,_}} -> ok;
+	Error -> Error
+    end.
+					   	   
 stop()->
     application:stop(?MODULE).

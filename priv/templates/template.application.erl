@@ -1,6 +1,6 @@
 %%minino application
 
--module({{ module }}).
+-module({{ application }}).
 
 %% minino funs
 -export([dispatch_rules/0]).

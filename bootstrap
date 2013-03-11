@@ -1,0 +1,33 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%% create the minino-manager escript
+
+-include_lib("kernel/include/file.hrl").
+
+-define(ESCRIPTNAME, "minino").
+
+
+main(_) ->
+    Files = get_files(),
+    Filename = filename:join("bin", ?ESCRIPTNAME),
+    filelib:ensure_dir(Filename),
+    escript:create(Filename,
+		   [shebang,
+		    {archive, Files, []}]),
+    {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
+    ok = file:change_mode(Filename, Mode bor 8#00111).
+
+get_files() ->
+    Ebin = filelib:wildcard(filename:join("ebin", "*")),
+    Deps = filelib:wildcard(filename:join(["deps", "*", "ebin", "*"])),
+    Templates = filelib:wildcard(filename:join(["priv", "templates", "*"])),
+    BeamPaths = ["rebar"] ++  Ebin ++ Deps ++ Templates,
+    lists:foldl(
+      fun(Path, Acc) ->
+    	      {ok, Bin} = file:read_file(Path),
+	      [P|_] = lists:reverse(filename:split(Path)),
+    	      [{P, Bin}|Acc]
+      end,
+      [],
+      BeamPaths).
+
