@@ -19,7 +19,11 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
+    %% read mapp conf
+    {ok, MConf} = minino_config:read(), 
+
     %% start cowboy
+    Port =  proplists:get_value(port, MConf, 8080),
     Dispatch = 
     	cowboy_router:compile([
     			       {'_', [{'_', minino_cowboy_handler, []} ]}
@@ -27,10 +31,10 @@ start(_StartType, _StartArgs) ->
     {ok, _} = 
     	cowboy:start_http(http, 
     			  100, 
-    			  [{port, 8080}], 
+    			  [{port, Port}], 
     			  [{env, [{dispatch, Dispatch}]}]
     			 ), 
-    minino_sup:start_link().
+    minino_sup:start_link(MConf).
 
 stop(_State) ->
     ok.
