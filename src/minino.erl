@@ -18,11 +18,20 @@ main(Args) ->
     minino_escript:main(Args).
 
 start()->
-    case  application:start(?MODULE) of
-	ok-> ok;
-	{error,{already_started,_}} -> ok;
-	Error -> Error
-    end.
+    ok = ensure_start(crypto),
+    ok = ensure_start(ranch),
+    ok = ensure_start(cowboy),
+    ok = ensure_start(minino).  
+
+  
 					   	   
 stop()->
     application:stop(?MODULE).
+
+
+ensure_start(App) ->
+    case  application:start(App) of
+ 	ok-> ok;
+ 	{error,{already_started,_}} -> ok;
+ 	Error -> Error
+     end.

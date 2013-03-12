@@ -19,6 +19,17 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
+    %% start cowboy
+    Dispatch = 
+    	cowboy_router:compile([
+    			       {'_', [{'_', minino_cowboy_handler, []} ]}
+    			      ]),
+    {ok, _} = 
+    	cowboy:start_http(http, 
+    			  100, 
+    			  [{port, 8080}], 
+    			  [{env, [{dispatch, Dispatch}]}]
+    			 ), 
     minino_sup:start_link().
 
 stop(_State) ->
