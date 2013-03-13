@@ -4,10 +4,10 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created :  6 Mar 2013 by Pablo Vieytes <pvieytes@openshine.com>
+%%% Created :  13 Mar 2013 by Pablo Vieytes <pvieytes@openshine.com>
 %%%-------------------------------------------------------------------
 
--module(minino_sup).
+-module(minino_dispatcher_sup).
 
 -behaviour(supervisor).
 
@@ -32,6 +32,6 @@ start_link(Params) ->
 %% ===================================================================
  
 init(Params) ->
-    DispSup = ?CHILD_WITH_PARAMS(minino_dispatcher_sup, supervisor, Params),
-    {ok, { {one_for_one, 5, 10}, [DispSup]} }.
+    Disp = ?CHILD_WITH_PARAMS(minino_dispatcher, worker, Params),
+    {ok, { {one_for_one, 5, 10}, [Disp]} }.
 

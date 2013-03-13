@@ -9,11 +9,13 @@
 
 -module(minino).
 
+
+%%API
 -export([main/1,
 	 start/0,
 	 stop/0]).
 
-%% script
+%% escript
 main(Args) ->
     minino_escript:main(Args).
 
@@ -22,8 +24,6 @@ start()->
     ok = ensure_start(ranch),
     ok = ensure_start(cowboy),
     ok = ensure_start(minino).  
-
-  
 					   	   
 stop()->
     application:stop(?MODULE).

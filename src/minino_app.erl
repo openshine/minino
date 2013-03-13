@@ -34,7 +34,8 @@ start(_StartType, _StartArgs) ->
     			  [{port, Port}], 
     			  [{env, [{dispatch, Dispatch}]}]
     			 ), 
-    minino_sup:start_link(MConf).
+    Params = [MConf],
+    minino_sup:start_link(Params).
 
 stop(_State) ->
     ok.
