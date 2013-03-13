@@ -11,7 +11,9 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1]).
+-export([start_link/1,
+	 dispatch/1,
+	 response/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -35,6 +37,14 @@
 start_link(Params) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Params, []).
 
+
+dispatch(MReq) ->
+    gen_server:call(?SERVER, {dispatch, MReq}).
+
+
+response(To, MResponse) ->
+    gen_server:reply(To, MResponse).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -51,7 +61,6 @@ start_link(Params) ->
 %% @end
 %%--------------------------------------------------------------------
 init([MConf]) ->
-    io:format("mconf: ~p~n", [MConf]),
     {ok, #state{mconf=MConf}}.
 
 %%--------------------------------------------------------------------
@@ -68,6 +77,15 @@ init([MConf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({dispatch, MReq}, From, State) ->
+    %% create worker process
+    Params = [{mreq, MReq},
+	      {mconf, State#state.mconf}, 
+	      {response_to, From}],
+    WSpec = {make_ref(), {minino_req_worker, start_link, [Params]}, permanent, 5000, worker, dynamic},
+    supervisor:start_child(minino_dispatcher_sup, WSpec),
+    {reply, ok, State};
+
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.

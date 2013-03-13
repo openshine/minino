@@ -13,12 +13,16 @@
 -export([handle/2]).
 -export([terminate/3]).
 
-init(_Transport, Req, []) ->
-	{ok, Req, undefined}.
+init(_Transport, CReq, []) ->
+    {ok, CReq, undefined}.
 
-handle(Req, State) ->
-	{ok, Req2} = cowboy_req:reply(200, [], <<"Hello world!">>, Req),
-	{ok, Req2, State}.
+handle(CReq, State) ->
+    MReq = req_cowboy_to_minino(CReq),
+    {ok, CReq2} = cowboy_req:reply(200, [], <<"Hello world!">>, CReq),
+    {ok, CReq2, State}.
 
 terminate(_Reason, _Req, _State) ->
 	ok.
+
+req_cowboy_to_minino(CReq) ->
+    CReq.
