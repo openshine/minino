@@ -16,13 +16,10 @@
 init(_Transport, CReq, []) ->
     {ok, CReq, undefined}.
 
-handle(CReq, State) ->
-    MReq = req_cowboy_to_minino(CReq),
-    {ok, CReq2} = cowboy_req:reply(200, [], <<"Hello world!">>, CReq),
-    {ok, CReq2, State}.
+handle(Req, State) ->
+    Req2 = minino_dispatcher:dispatch(Req),
+    %% {ok, Req2} = cowboy_req:reply(200, [], <<"Hello world!">>, Req),
+    {ok, Req2, State}.
 
 terminate(_Reason, _Req, _State) ->
 	ok.
-
-req_cowboy_to_minino(CReq) ->
-    CReq.

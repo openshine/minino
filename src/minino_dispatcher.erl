@@ -13,7 +13,8 @@
 %% API
 -export([start_link/1,
 	 dispatch/1,
-	 response/2]).
+	 response/2,
+	 update_rules/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -21,7 +22,12 @@
 
 -define(SERVER, ?MODULE). 
 
--record(state, {mconf}).
+-record(state, {mapp,
+		mconf,
+		match_fun}).
+
+
+-compile([export_all]).
 
 %%%===================================================================
 %%% API
@@ -38,12 +44,17 @@ start_link(Params) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Params, []).
 
 
-dispatch(MReq) ->
-    gen_server:call(?SERVER, {dispatch, MReq}).
+dispatch(Req) ->
+    gen_server:call(?SERVER, {dispatch, Req}).
 
 
 response(To, MResponse) ->
     gen_server:reply(To, MResponse).
+
+
+update_rules() ->
+    gen_server:call(?SERVER, update_rules).
+    
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -61,7 +72,13 @@ response(To, MResponse) ->
 %% @end
 %%--------------------------------------------------------------------
 init([MConf]) ->
-    {ok, #state{mconf=MConf}}.
+    MApp = proplists:get_value(app_mod, MConf),
+    MatchFun = create_match_fun(MApp:dispatch_rules()),
+    {ok, #state{mapp=MApp,
+		mconf=MConf,
+		match_fun=MatchFun
+	       }}.
+ 
 
 %%--------------------------------------------------------------------
 %% @private
@@ -77,14 +94,25 @@ init([MConf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({dispatch, MReq}, From, State) ->
+handle_call({dispatch, Req}, From, State) ->
     %% create worker process
-    Params = [{mreq, MReq},
-	      {mconf, State#state.mconf}, 
-	      {response_to, From}],
-    WSpec = {make_ref(), {minino_req_worker, start_link, [Params]}, permanent, 5000, worker, dynamic},
-    supervisor:start_child(minino_dispatcher_sup, WSpec),
-    {reply, ok, State};
+    Params = [Req, 
+	      State#state.mapp, 
+	      State#state.match_fun,  
+	      State#state.mconf, 
+	      From],
+    WSpec = {make_ref(), 
+	     {minino_req_worker, start_link, [Params]}, 
+	     permanent, 
+	     5000, 
+	     worker, 
+	     dynamic},
+    {_, {normal_stop, _}} = supervisor:start_child(minino_dispatcher_sup, WSpec),
+    {noreply, State};
+
+handle_call(update_rules, _From, State) ->
+     MatchFun = create_match_fun(MApp:dispatch_rules()),
+    {reply, ok, State#state{match_fun=MatchFun);
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -100,6 +128,8 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+
+
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -144,3 +174,103 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+
+%% @spec create_disp_fun(DispRules) -> F
+%% DispRules = [rule()]
+%% rule() =  {Id::atom(), Path::[string()|atom()], view::atom()}, 
+%% F::fun() 
+%% @end
+create_match_fun(DispRules)->
+    ParsedRules = [parse_rule(Rule) || Rule <- DispRules],
+    Clauses =
+	lists:foldl(
+	  fun({{M, R, _C}, View}, Acc) ->
+		  Clause = lists:flatten(io_lib:format("(~s) -> {~p, ~s}", [M, View, R])), 
+		  Acc ++ Clause ++ ";\n"
+	  end,
+	  [],
+	  ParsedRules),
+    FStr =  "fun"  ++ Clauses ++ "(_Esle) -> undefined \nend.",
+    {ok,Scanned,_} = erl_scan:string(FStr),
+    {ok,Parsed} = erl_parse:parse_exprs(Scanned),
+    {value, F, _} = erl_eval:exprs(Parsed,[]),
+    F.		  
+
+parse_rule({_Id, [], View}) ->
+    {{"[]","[]", 0}, View};
+
+parse_rule({_Id, RulePath, View}) ->
+    {create_match_str(RulePath), View}.
+
+	    
+create_match_str(RulePath) ->
+     create_match_str(RulePath, []).
+
+create_match_str([], Acc) ->
+    close_match(Acc);
+
+create_match_str(['*'|_], Acc) ->
+    append_match({tail}, Acc);
+
+create_match_str([Var|R], Acc) when is_atom(Var) ->
+    create_match_str(R, append_match(Var, Acc));
+
+create_match_str([String|R], Acc) ->
+    create_match_str(R, append_match(String, Acc)).
+
+
+append_match(E, [])->
+    Acc = {"", "", 0},
+    append_match(E, Acc);
+    
+append_match({tail}, {M, R, C}) ->
+    case M of
+	"" -> {"V", "V", 1};
+	M -> 
+	    V = lists:flatten(io_lib:format("V~p", [C])),
+	    M1 = M ++ " | " ++ V,
+	    R1 = 
+		case R of
+		    "" -> V;
+		    R -> R ++ ", " ++ V
+		end,
+	    close_match({M1, R1, C+1})
+    end;
+
+append_match(Var, {M, R, C}) when is_atom(Var) ->
+    V = lists:flatten(io_lib:format("V~p", [C])),
+    case M of
+	"" -> {V, V, C+1};
+	M -> 
+	    M1 = M ++ ", " ++ V,
+	    R1 = case R of
+		     "" -> V; 
+		     R -> R ++ ", " ++ V
+		 end,
+	    {M1, R1, C+1}
+    end;
+
+append_match(Str, {M, R, C}) when is_list(Str) ->
+    case M of
+	"" -> {escp(Str), R, C};
+	M ->
+	    M1 = M ++ ", " ++ escp(Str),
+	    {M1, R, C}
+    end.
+    
+close_match({M, R, C})->
+    M1 = case M of
+	     [] -> "[]";
+	     M -> "[" ++ M ++ "]"
+	 end,
+    R1 = case R of
+	     [] -> "[]";
+	     R -> "[" ++ R ++ "]"
+	 end,
+    
+    {M1, R1, C}.
+
+escp(S) -> "\"" ++ S ++ "\"".
+    
+
