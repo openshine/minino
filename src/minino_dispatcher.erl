@@ -111,8 +111,10 @@ handle_call({dispatch, Req}, From, State) ->
     {noreply, State};
 
 handle_call(update_rules, _From, State) ->
-     MatchFun = create_match_fun(MApp:dispatch_rules()),
-    {reply, ok, State#state{match_fun=MatchFun);
+    MApp =State#state.mapp,
+    R = MApp:dispatch_rules(),
+    MatchFun = create_match_fun(R),
+    {reply, ok, State#state{match_fun=MatchFun}};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,

@@ -13,6 +13,7 @@ main(_) ->
     filelib:ensure_dir(Filename),
     escript:create(Filename,
 		   [shebang,
+		    {emu_args, "-pa ebin -pa ebin/*/deps"},
 		    {archive, Files, []}]),
     {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
     ok = file:change_mode(Filename, Mode bor 8#00111).
