@@ -1,6 +1,5 @@
 #Minino
 
-an Erlang miniframework
 * [What is Minino?](#about)
 * [Authors](#authors)
 * [Get Minino](#getminino)
@@ -42,7 +41,6 @@ $ cd kitty
 $ cp /path/to/minino/bin/minino .
 $ ./minino create-app id=kitty
 $ ./rebar get-deps compile
-$ ./minino start
 ```
 
 
