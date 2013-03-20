@@ -14,7 +14,7 @@
 	[
 	 %%{Name::string(), Help()::string(), Available:: always | appcreated
 	 {"create-app", "create a new app; create-app id=myapp", always},
-	 {"start", "start minino", appcreated}
+	 {"runserver", "runserver [port]", appcreated}
 	]).
 
 %% API
@@ -98,7 +98,13 @@ command(CommandArgs)->
     case CommandArgs of
 	["create-app",[$i,$d,$=|AppName]] ->
 	    create_app(AppName);
-	["start"] ->
+	["runserver" | PortList] ->
+	    case PortList of
+	    	[PStr] when is_list(PStr) ->	
+		    {Port, _} = string:to_integer(PStr),
+	    	    application:set_env(minino, mport, Port);
+	    	_ -> ignore
+	    end,
 	    ok = minino:start(),
 	    timer:sleep(infinity);
 	_ -> notavailable
