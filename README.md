@@ -1,4 +1,4 @@
 minino
 ======
 
-an Erlang miniframework
+minino is microframework for erlang
