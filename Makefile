@@ -5,3 +5,7 @@ all:
 
 clean:
 	./rebar clean
+
+test: 	all
+	./rebar ct skip_deps=true
+

@@ -13,7 +13,12 @@
 
 
 read()->
-    Filename = filename:join(["priv", "settings.cfg"]),
+    io:format("file: ~p~n", [ application:get_env(minino, settings_file)]),
+    Filename = 
+	case application:get_env(minino, settings_file) of
+	    {ok, P} -> P;
+	    _ -> filename:join(["priv", "settings.cfg"])
+	end,
     file:consult(Filename).
 
-    
+
