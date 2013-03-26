@@ -33,5 +33,7 @@ ensure_start(App) ->
     case  application:start(App) of
  	ok-> ok;
  	{error,{already_started,_}} -> ok;
- 	Error -> Error
+ 	Error ->
+	    error_logger:error_msg("start app ~p: ~p", [App, Error]),
+	    Error
      end.

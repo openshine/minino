@@ -9,15 +9,33 @@
 
 -module(minino_config).
 
--export([read/0]).
+-export([get/0]).
 
 
-read()->
+get()->
     Filename = 
 	case application:get_env(minino, settings_file) of
-	    {ok, P} -> P;
+	    {ok, S} -> S;
 	    _ -> filename:join(["priv", "settings.cfg"])
 	end,
-    file:consult(Filename).
+    {ok, Conf} = file:consult(Filename),
+
+    Conf2 = 
+    	case application:get_env(minino, mport) of
+    	    {ok, P} -> 
+		C = proplists:delete(port, Conf),
+		[{port, P}|C];
+	    _ -> Conf
+    	end,
+
+    TemplatesDir = 
+    	case application:get_env(minino, templates_dir) of
+	    {ok, T} -> 
+		{templates_dir, T};
+	    _ ->
+		{templates_dir,
+		 filename:join(["priv", "templates"])}
+	end,
+    {ok, [TemplatesDir|Conf2]}.
 
 

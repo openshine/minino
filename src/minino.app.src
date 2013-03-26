@@ -7,6 +7,6 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { minino_app, []}},
+  {mod, {minino_app, []}},
   {env, []}
  ]}.

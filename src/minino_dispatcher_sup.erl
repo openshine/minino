@@ -33,5 +33,5 @@ start_link(Params) ->
  
 init(Params) ->
     Disp = ?CHILD_WITH_PARAMS(minino_dispatcher, worker, Params),
-    {ok, { {one_for_one, 5, 10}, [Disp]} }.
+    {ok, { {one_for_one, 5, 10}, [Disp]}}.
 

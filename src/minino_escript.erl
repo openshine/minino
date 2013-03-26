@@ -174,6 +174,19 @@ create_app(AppName) ->
 	    file:write_file(SettingsFileName, list_to_binary(SetStr))
     end,
 
+    %% create html template
+    HomeTemplate = filename:join(["priv", "templates", "home.html"]),
+    case filelib:is_regular(HomeTemplate) of
+	true -> 
+	    ignore;
+	false ->
+	    HomeBin = get_bin("template.home.html"),
+	    filelib:ensure_dir(HomeTemplate),
+	    file:write_file(HomeTemplate, HomeBin)
+    end,
+
+
+
     ok.
 
 get_bin(FileName) ->

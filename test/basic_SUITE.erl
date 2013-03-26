@@ -3,32 +3,38 @@
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 -export([simple_tests/1, 
-	 test/1]).
+	 tests/1]).
 
-all() -> [simple_tests].
+all() -> [tests, 
+	  simple_tests
+	 ].
 
 init_per_testcase(simple_tests, Config) ->
     Config;   
 
-init_per_testcase(test, Config) ->
+init_per_testcase(tests, Config) ->
     application:start(inets),
 
     MininoPriv = code:priv_dir(minino),
     MininoBinFilename = filename:join([MininoPriv, "..", "bin", "minino"]),
-    io:format("MininoBinFilename: ~p~n", [MininoBinFilename]),
+
     TestPriv = proplists:get_value(priv_dir, Config),
     CpCmd = lists:flatten(io_lib:format("cp ~s ~s", [MininoBinFilename, TestPriv])),
     os:cmd(CpCmd),
     AppCmd = lists:flatten(
-	       io_lib:format("cd ~s; ./minino create-app id=kitty; ./rebar get-deps compile", [TestPriv])),
+    	       io_lib:format("cd ~s; ./minino create-app id=kitty", [TestPriv])),
     os:cmd(AppCmd),
 
-    %% add ebin kitty to path
-    code:add_path(filename:join(TestPriv, "ebin")),
+    KittyPath = filename:join([TestPriv, "src", "kitty.erl"]),
+    compile:file(KittyPath),
 
     %% set settings.cfg file
     Settings = filename:join([TestPriv, "priv", "settings.cfg"]),
     application:set_env(minino, settings_file, Settings),      
+
+    %% set templates dir
+    Templates = filename:join([TestPriv, "priv", "templates"]),
+    application:set_env(minino, templates_dir, Templates),      
     
     %%start minino
     minino:start(),
@@ -40,35 +46,37 @@ end_per_testcase(_Test, _Config) ->
 
 
 %%======================================================
-%% TESTS
+%% tests
 %%======================================================
 
-test(_Config) ->
-    {ok, _} = httpc:request("http://127.0.0.1:8000"),
+tests(_Config) ->
+    ping(),
+    ok.
+
+ping() ->  
+    {ok, R} = httpc:request("http://127.0.0.1:8000"),
+    {{_,200,_},_,_} = R,
+    io:format("test ping: http://127.0.0.1:8000 -> ok"),
     ok.
 
 
+%%======================================================
+%% Simple Tests
+%%======================================================
 
 simple_tests(_Config) ->
     check_dispatch_rules(),
     ok.
-    
-
-
-
-
-
-
 
 check_dispatch_rules() ->
-    io:format("check_dispatch_rules~n"),
+    io:format("~n** dispatch rules test **"),
     DRules =    
 	[%% {Id::atom(), Path::[string()|atom()], view::atom()}
 	 {root_page, [], home_view},
 	 {home_page, ["home"], home_view},
 	 {test_page, ["test", testvalue], test_view}
 	],
-    io:format("Dispatch rules: ~p~n", [DRules]),
+    io:format("Dispatch rules: ~p", [DRules]),
     F = minino_dispatcher:create_match_fun(DRules),
 
     %% test path
@@ -99,5 +107,5 @@ check_path(Path, Fun, Expected)->
 	      RArgs);
 	undefined -> R = undefined
     end,
-    io:format("check path ~p Expected: ~p -> ok~n", [Path, Expected]).
+    io:format("check path ~p Expected: ~p -> ok", [Path, Expected]).
 

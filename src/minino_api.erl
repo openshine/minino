@@ -10,22 +10,36 @@
 
 
 -export([response/2,
-	 path/1]).
+	 path/1,
+	 render_template/2]).
+
+-type template_path() :: string().
+-type template_args() :: [{atom(), string()}].
+
+
 
 
 response({error, 404}, Req) ->
-    {ok, Req2} = cowboy_req:reply(404, [], <<"Error 404: Not found">>, Req),
+    CReq = proplists:get_value(cowreq, Req),
+    {ok, Req2} = cowboy_req:reply(404, [], <<"Error 404: Not found">>, CReq),
     Req2;
 
 response(Msg, Req) when is_list(Msg) ->
+    CReq = proplists:get_value(cowreq, Req),
     {ok, Req2} = cowboy_req:reply(200, 
 				  [], 
 				  list_to_binary(Msg), 
-				  Req),
+				  CReq),
     Req2.
 
 
 path(Req) ->
-    {BinPath, _} = cowboy_req:path(Req),
+    CReq = proplists:get_value(cowreq, Req),
+    {BinPath, _} = cowboy_req:path(CReq),
     string:tokens(binary_to_list(BinPath), "/").
 	
+
+%% @doc render a template.
+-spec render_template(template_path(), template_args()) -> {ok, string()} | {error, term()}.
+render_template(Template, Args) ->
+    minino_templates:render(Template, Args).

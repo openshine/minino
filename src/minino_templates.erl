@@ -4,30 +4,34 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created :  13 Mar 2013 by Pablo Vieytes <pvieytes@openshine.com>
+%%% Created :  26 Mar 2013 by Pablo Vieytes <pvieytes@openshine.com>
 %%%-------------------------------------------------------------------
--module(minino_dispatcher).
+-module(minino_templates).
 
 -behaviour(gen_server).
 
-%% API
+%%API
+
 -export([start_link/1,
-	 dispatch/1,
-	 response/2,
-	 update_rules/0]).
+	 render/1,
+	 render/2
+	]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+
 -define(SERVER, ?MODULE). 
 
--record(state, {mapp,
-		mconf,
-		match_fun}).
+
+-record(state, {compiled_templates}).
 
 
--compile([export_all]).
+-type template_path() :: string().
+-type template_args() :: [{atom(), string()}].
+
+
 
 %%%===================================================================
 %%% API
@@ -44,17 +48,26 @@ start_link(Params) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Params, []).
 
 
-dispatch(Req) ->
-    gen_server:call(?SERVER, {dispatch, Req}).
+%% @doc render a template.
+-spec render(template_path()) -> {ok, string()} | {error, term()}.
+render(Template) ->
+    render(Template, []).
 
+%% @doc render a template.
+-spec render(template_path(), template_args()) -> {ok, string()} | {error, term()}.
+render(Template, Args) ->
+    Mod = gen_server:call(?SERVER, {get_template_mod, filename:split(Template)}),
+    case Mod of
+	undefined -> {error, "undefined template"};
+	Mod -> 
+	    case Mod:render(Args) of
+		{ok, IoList} -> {ok, binary_to_list(
+				       erlang:iolist_to_binary(IoList))
+				};
+		Else -> Else
+	    end
+    end.
 
-response(To, MResponse) ->
-    gen_server:reply(To, MResponse).
-
-
-update_rules() ->
-    gen_server:call(?SERVER, update_rules).
-    
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -72,12 +85,10 @@ update_rules() ->
 %% @end
 %%--------------------------------------------------------------------
 init([MConf]) ->
-    MApp = proplists:get_value(app_mod, MConf),
-    MatchFun = create_match_fun(MApp:dispatch_rules()),
-    {ok, #state{mapp=MApp,
-		mconf=MConf,
-		match_fun=MatchFun
-	       }}.
+    TemplatesDir = proplists:get_value(templates_dir, MConf),
+    Templates = get_templates(TemplatesDir),
+    CompiledT = compile_templates(Templates),
+    {ok, #state{compiled_templates=CompiledT}}.
 
 
 %%--------------------------------------------------------------------
@@ -94,27 +105,9 @@ init([MConf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({dispatch, Req}, From, State) ->
-    %% create worker process
-    Params = [Req, 
-	      State#state.mapp, 
-	      State#state.match_fun,  
-	      State#state.mconf, 
-	      From],
-    WSpec = {make_ref(), 
-	     {minino_req_worker, start_link, [Params]}, 
-	     permanent, 
-	     5000, 
-	     worker, 
-	     dynamic},
-    {_, {normal_stop, _}} = supervisor:start_child(minino_dispatcher_sup, WSpec),
-    {noreply, State};
-
-handle_call(update_rules, _From, State) ->
-    MApp =State#state.mapp,
-    R = MApp:dispatch_rules(),
-    MatchFun = create_match_fun(R),
-    {reply, ok, State#state{match_fun=MatchFun}};
+handle_call({get_template_mod, Template}, _From, State) ->
+    Mod = proplists:get_value(Template, State#state.compiled_templates),
+    {reply, Mod, State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -130,8 +123,6 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-
-
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -178,107 +169,47 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-%% @spec create_disp_fun(DispRules) -> F
-%% DispRules = [rule()]
-%% rule() =  {Id::atom(), Path::[string()|atom()], view::atom()}, 
-%% F::fun() 
-%% @end
-create_match_fun(DispRules)->
-    ParsedRules = [parse_rule(Rule) || Rule <- DispRules],
-    Clauses =
-	lists:foldl(
-	  fun({{M, R, _C}, View}, Acc) ->
-		  Clause = lists:flatten(io_lib:format("(~s) -> {~p, ~s}", [M, View, R])), 
-		  Acc ++ Clause ++ ";\n"
-	  end,
-	  [],
-	  ParsedRules),
-    FStr =  "fun"  ++ Clauses ++ "(_Esle) -> undefined \nend.",
-    {ok,Scanned,_} = erl_scan:string(FStr),
-    {ok,Parsed} = erl_parse:parse_exprs(Scanned),
-    {value, F, _} = erl_eval:exprs(Parsed,[]),
-    F.		  
 
-parse_rule({_Id, [], View}) ->
-    {{"[]","[]", 0}, View};
+compile_templates(Templates)->
+    compile_templates_loop(Templates, []).
 
-parse_rule({_Id, RulePath, View}) ->
-    {create_match_str(RulePath), View}.
+compile_templates_loop([], Acc)->
+    Acc;
 
-	    
-create_match_str(RulePath) ->
-     create_match_str(RulePath, []).
-
-create_match_str([], Acc) ->
-    close_match(Acc);
-
-create_match_str(['*'|_], Acc) ->
-    append_match({tail}, Acc);
-
-create_match_str([Var|R], Acc) when is_atom(Var) ->
-    create_match_str(R, append_match(Var, Acc));
-
-create_match_str([String|R], Acc) ->
-    create_match_str(R, append_match(String, Acc)).
+compile_templates_loop([{RelativePath, Path}|Tail], Acc) ->
+    Aux = string:tokens(string:join(RelativePath, "_"), "."),
+    Mod = list_to_atom("tpl_" ++ string:join(Aux, "_")),
+    ok = erlydtl:compile(Path, Mod),
+    compile_templates_loop(Tail, [{RelativePath, Mod}|Acc]).
 
 
-append_match(E, [])->
-    Acc = {"", "", 0},
-    append_match(E, Acc);
-    
-append_match({tail}, {M, R, C}) ->
-    case M of
-	"" -> {"V", "V", 1};
-	M -> 
-	    V = lists:flatten(io_lib:format("V~p", [C])),
-	    M1 = M ++ " | " ++ V,
-	    R1 = 
-		case R of
-		    "" -> V;
-		    R -> R ++ ", " ++ V
-		end,
-	    close_match({M1, R1, C+1})
-    end;
+get_templates(TemplatesDir) ->
+    Templates = get_templates_recursive(TemplatesDir),
+    SplitedTemDir = filename:split(TemplatesDir),
+    lists:map(fun(T) -> 
+		      RPath = get_relative_path(SplitedTemDir, filename:split(T)),
+		      {RPath, T}
+	      end,
+	      Templates).		      
 
-append_match(Var, {M, R, C}) when is_atom(Var) ->
-    V = lists:flatten(io_lib:format("V~p", [C])),
-    TupleStr = 
-	"{" ++ 
-	erlang:atom_to_list(Var) ++ 
-	", " ++
-	V ++ 
-	"}",
-    case M of
-	"" -> {V, V, C+1};
-	M -> 
-	    M1 = M ++ ", " ++ V,
-	    R1 = case R of
-		     "" -> TupleStr; 
-		     R -> R ++ ", " ++ TupleStr
-		 end,
-	    {M1, R1, C+1}
-    end;
-
-append_match(Str, {M, R, C}) when is_list(Str) ->
-    case M of
-	"" -> {escp(Str), R, C};
-	M ->
-	    M1 = M ++ ", " ++ escp(Str),
-	    {M1, R, C}
+get_templates_recursive(Filename) ->
+    case filelib:is_dir(Filename) of
+	true ->
+	    Sons = filelib:wildcard(filename:join(Filename, "*")),
+	    lists:foldl(
+	      fun(F, Acc)->
+		      R = get_templates_recursive(F),
+		      Acc ++ R
+	      end,
+	      [],
+	      Sons);
+	false ->
+	    [Filename]
     end.
-    
-close_match({M, R, C})->
-    M1 = case M of
-	     [] -> "[]";
-	     M -> "[" ++ M ++ "]"
-	 end,
-    R1 = case R of
-	     [] -> "[]";
-	     R -> "[" ++ R ++ "]"
-	 end,
-    
-    {M1, R1, C}.
 
-escp(S) -> "\"" ++ S ++ "\"".
-    
 
+
+get_relative_path([], T) ->
+    T;			  
+get_relative_path([_|BaseTail],[_|T]) ->
+    get_relative_path(BaseTail, T).

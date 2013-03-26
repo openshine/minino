@@ -28,7 +28,8 @@ dispatch_rules() ->
 %% views
 
 home_view(Req, _Args) ->
-    minino_api:response("<html><body>hello world!</body></html>", Req).
+    {ok, Html} = minino_api:render_template("home.html", [{text, "Meow!!"}]),
+    minino_api:response(Html, Req).
 
 test_view(Req, Args) ->
     TestVal = proplists:get_value(testvalue, Args),

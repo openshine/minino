@@ -46,15 +46,16 @@ start_link(Params) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Req, MApp, MatchFun, _MConf, To]) ->
+init([CowReq, MApp, MatchFun, MConf, To]) ->
+    Req = [{cowreq, CowReq}|MConf],
     Path = minino_api:path(Req),
-    Response =
-	case MatchFun(Path) of
-	    undefined ->
-		minino_api:response({error, 404}, Req);
-	    {View, Args} ->
-		MApp:View(Req, Args)
-	end,
+     Response =
+     	case MatchFun(Path) of
+    	    undefined ->
+    		minino_api:response({error, 404}, Req);
+    	    {View, Args} ->
+    		 R = MApp:View(Req, Args)
+    	end,
     minino_dispatcher:response(To, Response),
     {stop, normal_stop}.
 
