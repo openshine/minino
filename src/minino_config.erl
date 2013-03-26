@@ -13,7 +13,6 @@
 
 
 read()->
-    io:format("file: ~p~n", [ application:get_env(minino, settings_file)]),
     Filename = 
 	case application:get_env(minino, settings_file) of
 	    {ok, P} -> P;

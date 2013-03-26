@@ -31,6 +31,6 @@ home_view(Req, _Args) ->
     minino_api:response("<html><body>hello world!</body></html>", Req).
 
 test_view(Req, Args) ->
-    [TestVal] = Args,
+    TestVal = proplists:get_value(testvalue, Args),
     Html = lists:flatten(io_lib:format("<html><body>test: ~s</body></html>", [TestVal])),
     minino_api:response(Html, Req).

@@ -242,13 +242,19 @@ append_match({tail}, {M, R, C}) ->
 
 append_match(Var, {M, R, C}) when is_atom(Var) ->
     V = lists:flatten(io_lib:format("V~p", [C])),
+    TupleStr = 
+	"{" ++ 
+	erlang:atom_to_list(Var) ++ 
+	", " ++
+	V ++ 
+	"}",
     case M of
 	"" -> {V, V, C+1};
 	M -> 
 	    M1 = M ++ ", " ++ V,
 	    R1 = case R of
-		     "" -> V; 
-		     R -> R ++ ", " ++ V
+		     "" -> TupleStr; 
+		     R -> R ++ ", " ++ TupleStr
 		 end,
 	    {M1, R1, C+1}
     end;
