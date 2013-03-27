@@ -6,3 +6,4 @@ deps
 *.o
 *.beam
 *.plt
+bin/minino
