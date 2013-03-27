@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%% create the minino-manager escript
+%% @doc create the minino-manager escript
 
 -include_lib("kernel/include/file.hrl").
 

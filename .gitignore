@@ -1,5 +1,6 @@
 /ebin
 /logs
+/doc
 .eunit
 deps
 *.o
