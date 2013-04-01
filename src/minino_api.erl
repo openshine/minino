@@ -11,12 +11,12 @@
 
 -export([response/2,
 	 path/1,
-	 render_template/2]).
+	 render_template/2,
+	 build_url/3
+	]).
 
 -type template_path() :: string().
 -type template_args() :: [{atom(), string()}].
-
-
 
 
 response({error, 404}, Req) ->
@@ -43,3 +43,15 @@ path(Req) ->
 -spec render_template(template_path(), template_args()) -> {ok, string()} | {error, term()}.
 render_template(Template, Args) ->
     minino_templates:render(Template, Args).
+
+
+
+%% @doc build url.
+-spec build_url(Id::atom(), Args::[{Key::atom(), Value::string()}], Req::term()) -> 
+		       {ok, string()} | {error, term()}.
+build_url(Id, Args, Req) ->
+    F = proplists:get_value(build_url_fun, Req),
+    F(Id, Args).
+
+
+

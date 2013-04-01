@@ -66,16 +66,21 @@ ping() ->
 
 simple_tests(_Config) ->
     check_dispatch_rules(),
+    check_build_urls(),
     ok.
+
+
+get_dispatch_rules() ->
+    [%% {Id::atom(), Path::[string()|atom()], view::atom()}
+     {root_page, [], home_view},
+     {home_page, ["home"], home_view},
+     {test_page, ["test", testvalue], test_view}
+    ].
 
 check_dispatch_rules() ->
     io:format("~n** dispatch rules test **"),
-    DRules =    
-	[%% {Id::atom(), Path::[string()|atom()], view::atom()}
-	 {root_page, [], home_view},
-	 {home_page, ["home"], home_view},
-	 {test_page, ["test", testvalue], test_view}
-	],
+    DRules = get_dispatch_rules(), 
+
     io:format("Dispatch rules: ~p", [DRules]),
     F = minino_dispatcher:create_match_fun(DRules),
 
@@ -109,3 +114,14 @@ check_path(Path, Fun, Expected)->
     end,
     io:format("check path ~p Expected: ~p -> ok", [Path, Expected]).
 
+
+
+check_build_urls() ->
+    DRules = get_dispatch_rules(), 
+    F = minino_dispatcher:create_build_url_fun(DRules),
+    io:format("~p path -> ~p", [root_page, F(root_page, [])]),
+    io:format("~p path -> ~p", [home_page, F(home_page, [])]),
+    io:format("~p path -> ~p", [test_page, F(test_page, [{testvalue, "data"}])]),
+
+    ok.
+    

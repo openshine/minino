@@ -20,11 +20,17 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+-type rule() :: {Id::atom(), Path::[string()|atom()], View::atom()}.
+
+
+
 -define(SERVER, ?MODULE). 
 
 -record(state, {mapp,
 		mconf,
-		match_fun}).
+		match_fun,
+		build_url_fun
+	       }).
 
 
 -compile([export_all]).
@@ -74,8 +80,10 @@ update_rules() ->
 init([MConf]) ->
     MApp = proplists:get_value(app_mod, MConf),
     MatchFun = create_match_fun(MApp:dispatch_rules()),
+    BuildUrlFun = create_build_url_fun(MApp:dispatch_rules()),
     {ok, #state{mapp=MApp,
 		mconf=MConf,
+		build_url_fun=BuildUrlFun,
 		match_fun=MatchFun
 	       }}.
 
@@ -99,6 +107,7 @@ handle_call({dispatch, Req}, From, State) ->
     Params = [Req, 
 	      State#state.mapp, 
 	      State#state.match_fun,  
+	      State#state.build_url_fun,
 	      State#state.mconf, 
 	      From],
     WSpec = {make_ref(), 
@@ -282,3 +291,52 @@ close_match({M, R, C})->
 escp(S) -> "\"" ++ S ++ "\"".
     
 
+
+%% @doc create build url fun
+%% -spec create_build_url_fun(Rules::[rule()]) -> fun()
+create_build_url_fun(DispRules) ->
+    fun(Id, Args) ->
+	    build_url(Id, Args, DispRules)
+    end.
+
+
+
+
+%% @doc build url
+%% -spec create_build_url_fun(Id::atom(), Args::[{Key::atom(), Val::string()}], [rule()]) -> 
+%%       			  {ok, Url::string()} | {error, term()}
+build_url(Id, Args, DispRules) ->
+    case  get_path_loop(DispRules, Id) of
+	undefined -> undefined;
+	Path ->
+	    url_append_items(Path, Args, [])
+    end.
+	
+
+get_path_loop([], Id)->
+    undefined; 
+get_path_loop([{Id, Path,_}|_], Id) ->
+    Path;
+get_path_loop([_|Tail], Id) ->
+    get_path_loop(Tail, Id).
+
+
+url_append_items([], _args, Acc) ->
+    "/" ++ string:join(lists:reverse(Acc), "/");
+
+url_append_items([E|T], Args, Acc) ->
+    Val =
+	case E of
+	    E when is_atom(E) ->
+		case proplists:get_value(E, Args) of
+		    V when V /= undefined ->
+			V
+		end;
+	    E when is_list(E)->
+		E
+	end,
+    url_append_items(T, Args, [Val|Acc]).
+
+    
+	    
+		  
