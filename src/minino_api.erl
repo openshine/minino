@@ -12,7 +12,8 @@
 -export([response/2,
 	 path/1,
 	 render_template/2,
-	 build_url/3
+	 build_url/3,
+	 get_settings/1
 	]).
 
 -type template_path() :: string().
@@ -54,4 +55,7 @@ build_url(Id, Args, Req) ->
     F(Id, Args).
 
 
-
+%% @doc get minino settings.
+-spec get_settings(Req::term()) -> [term()].
+get_settings(Req) ->
+     proplists:get_value(mconf, Req).

@@ -47,7 +47,7 @@ start_link(Params) ->
 %% @end
 %%--------------------------------------------------------------------
 init([CowReq, MApp, MatchFun, BuildUrlFun, MConf, To]) ->
-    Req = [{cowreq, CowReq}, {build_url_fun, BuildUrlFun}|MConf],
+    Req = [{cowreq, CowReq}, {build_url_fun, BuildUrlFun}, {mconf,MConf}],
     Path = minino_api:path(Req),
      Response =
      	case MatchFun(Path) of
