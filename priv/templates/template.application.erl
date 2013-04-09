@@ -9,7 +9,8 @@
 
 %% views
 -export([home_view/2,
-	 test_view/2]).
+	 test_view/2,
+	 upload_view/2]).
 
 
 %% minino funs
@@ -21,17 +22,22 @@ dispatch_rules() ->
     [%% {Id::atom(), Path::[string()|atom()], view::atom()}
      {root_page, [], home_view},
      {home_page, ["home"], home_view},
-     {test_page, ["test", testvalue], test_view}
+     {test_page, ["test", testvalue], test_view},
+     {upload_page, ["upload"], upload_view}
     ].
 
 
 %% views
 
-home_view(Req, _Args) ->
+home_view(MReq, _Args) ->
     {ok, Html} = minino_api:render_template("home.html", [{text, "Meow!!"}]),
-    minino_api:response(Html, Req).
+    minino_api:response(Html, MReq).
 
-test_view(Req, Args) ->
+test_view(MReq, Args) ->
     TestVal = proplists:get_value(testvalue, Args),
     Html = lists:flatten(io_lib:format("<html><body>test: ~s</body></html>", [TestVal])),
-    minino_api:response(Html, Req).
+    minino_api:response(Html, MReq).
+
+upload_view(MReq, _Args) ->
+    {ok, Html} = minino_api:render_template("uploadfile.html", []),
+    minino_api:response(Html, MReq).

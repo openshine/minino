@@ -14,7 +14,9 @@
 -export([start_link/1,
 	 dispatch/1,
 	 response/2,
-	 update_rules/0]).
+	 update_rules/0,
+	 create_match_fun/1,
+	 create_build_url_fun/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -33,7 +35,7 @@
 	       }).
 
 
--compile([export_all]).
+%% -compile([export_all]).
 
 %%%===================================================================
 %%% API
@@ -50,8 +52,8 @@ start_link(Params) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Params, []).
 
 
-dispatch(Req) ->
-    gen_server:call(?SERVER, {dispatch, Req}).
+dispatch(MReq) ->
+    gen_server:call(?SERVER, {dispatch, MReq}).
 
 
 response(To, MResponse) ->
@@ -102,9 +104,9 @@ init([MConf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({dispatch, Req}, From, State) ->
+handle_call({dispatch, MReq}, From, State) ->
     %% create worker process
-    Params = [Req, 
+    Params = [MReq, 
 	      State#state.mapp, 
 	      State#state.match_fun,  
 	      State#state.build_url_fun,

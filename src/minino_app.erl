@@ -20,7 +20,7 @@
 
 start(_StartType, _StartArgs) ->
     %% read mapp conf
-    {ok, MConf} = minino_config:get(), 
+    {ok, MConf} = minino_config:read_conf(), 
     Port = proplists:get_value(port, MConf, 8080),
    
     %% start cowboy

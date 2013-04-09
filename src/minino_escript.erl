@@ -174,18 +174,25 @@ create_app(AppName) ->
 	    file:write_file(SettingsFileName, list_to_binary(SetStr))
     end,
 
-    %% create html template
-    HomeTemplate = filename:join(["priv", "templates", "home.html"]),
-    case filelib:is_regular(HomeTemplate) of
+    %% create html templates
+    HomeTemplatePath = filename:join(["priv", "templates", "home.html"]),
+    case filelib:is_regular(HomeTemplatePath) of
 	true -> 
 	    ignore;
 	false ->
 	    HomeBin = get_bin("template.home.html"),
-	    filelib:ensure_dir(HomeTemplate),
-	    file:write_file(HomeTemplate, HomeBin)
+	    filelib:ensure_dir(HomeTemplatePath),
+	    file:write_file(HomeTemplatePath, HomeBin)
     end,
-
-
+    UploadTemplatePath = filename:join(["priv", "templates", "uploadfile.html"]),
+    case filelib:is_regular(UploadTemplatePath) of
+	true -> 
+	    ignore;
+	false ->
+	    UploadBin = get_bin("template.uploadfile.html"),
+	    filelib:ensure_dir(UploadTemplatePath),
+	    file:write_file(UploadTemplatePath, UploadBin)
+    end,
 
     ok.
 

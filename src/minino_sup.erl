@@ -32,6 +32,7 @@ start_link(Params) ->
 %% ===================================================================
  
 init(Params) ->
+    ConfServer = ?CHILD(minino_config, worker),
     DispSup = ?CHILD_WITH_PARAMS(minino_dispatcher_sup, supervisor, Params),
     TempSup = ?CHILD_WITH_PARAMS(minino_templates_sup, supervisor, Params),
-    {ok, {{one_for_one, 5, 10}, [DispSup, TempSup]} }.
+    {ok, {{one_for_one, 5, 10}, [ConfServer, DispSup, TempSup]} }.

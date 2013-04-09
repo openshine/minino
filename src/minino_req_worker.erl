@@ -10,6 +10,8 @@
 
 -behaviour(gen_server).
 
+-include("include/minino.hrl").
+
 %% API
 -export([start_link/1]).
 
@@ -46,15 +48,15 @@ start_link(Params) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([CowReq, MApp, MatchFun, BuildUrlFun, MConf, To]) ->
-    Req = [{cowreq, CowReq}, {build_url_fun, BuildUrlFun}, {mconf,MConf}],
-    Path = minino_api:path(Req),
+init([MReq, MApp, MatchFun, BuildUrlFun, MConf, To]) ->
+    MReq2 = MReq#mreq{build_url_fun=BuildUrlFun, mconf=MConf},
+    Path = minino_api:path(MReq2),
      Response =
      	case MatchFun(Path) of
     	    undefined ->
-    		minino_api:response({error, 404}, Req);
+    		minino_api:response({error, 404}, MReq2);
     	    {View, Args} ->
-		MApp:View(Req, Args)
+		MApp:View(MReq, Args)
     	end,
     minino_dispatcher:response(To, Response),
     {stop, normal_stop}.

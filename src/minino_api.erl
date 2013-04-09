@@ -7,6 +7,7 @@
 %%% Created :  15 Mar 2013 by Pablo Vieytes <pvieytes@openshine.com>
 %%%-------------------------------------------------------------------
 -module(minino_api).
+-include("include/minino.hrl").
 
 
 -export([response/2,
@@ -20,25 +21,13 @@
 -type template_args() :: [{atom(), string()}].
 
 
-response({error, 404}, Req) ->
-    CReq = proplists:get_value(cowreq, Req),
-    {ok, Req2} = cowboy_req:reply(404, [], <<"Error 404: Not found">>, CReq),
-    Req2;
 
-response(Msg, Req) when is_list(Msg) ->
-    CReq = proplists:get_value(cowreq, Req),
-    {ok, Req2} = cowboy_req:reply(200, 
-				  [], 
-				  list_to_binary(Msg), 
-				  CReq),
-    Req2.
+response(Msg, MReq)->
+    minino_req:response(Msg, MReq).
 
+path(MReq) ->
+    minino_req:path(MReq).
 
-path(Req) ->
-    CReq = proplists:get_value(cowreq, Req),
-    {BinPath, _} = cowboy_req:path(CReq),
-    string:tokens(binary_to_list(BinPath), "/").
-	
 
 %% @doc render a template.
 -spec render_template(template_path(), template_args()) -> {ok, string()} | {error, term()}.
@@ -48,14 +37,14 @@ render_template(Template, Args) ->
 
 
 %% @doc build url.
--spec build_url(Id::atom(), Args::[{Key::atom(), Value::string()}], Req::term()) -> 
+-spec build_url(Id::atom(), Args::[{Key::atom(), Value::string()}], MReq::term()) -> 
 		       {ok, string()} | {error, term()}.
-build_url(Id, Args, Req) ->
-    F = proplists:get_value(build_url_fun, Req),
+build_url(Id, Args, MReq) ->
+    F = MReq#mreq.build_url_fun,
     F(Id, Args).
 
 
 %% @doc get minino settings.
 -spec get_settings(Req::term()) -> [term()].
-get_settings(Req) ->
-     proplists:get_value(mconf, Req).
+get_settings(MReq) ->
+    MReq#mreq.mconf.
