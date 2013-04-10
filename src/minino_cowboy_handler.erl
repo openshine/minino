@@ -18,11 +18,12 @@
 init(_Transport, CReq, []) ->
     {ok, CReq, undefined}.
 
+
 handle(CReq, State) ->
-    MReq = #mreq{creq=CReq},
+    {ok, Session, MReq} = minino_sessions:get_or_create(#mreq{creq=CReq}),
     MReq1 = write_multipart_to_file(MReq),
-    MReq2 = minino_dispatcher:dispatch(MReq1),
-    CReqRespose =  MReq2#mreq.creq,
+    MReq2 = minino_dispatcher:dispatch(MReq1#mreq{session=Session}),
+    CReqRespose = MReq2#mreq.creq,
     {ok, CReqRespose, State}.
 
 terminate(_Reason, _Req, _State) ->
@@ -59,12 +60,13 @@ write_multipart_to_file_loop(MReq, Fd, Path) ->
 
 
 get_tmp_path() ->
-    Str = lists:flatten(io_lib:format("~p", [now()])),
-    Md5 = erlang:md5(Str),
-    Filename = lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= Md5]),
+    Filename = random_md5(),
     {ok, MConf} = minino_config:get(),
     Dir = proplists:get_value(uploadfiles, MConf, "priv/tmp"),
     filename:join([Dir, Filename]).
 
 
-
+random_md5() ->
+    Str = lists:flatten(io_lib:format("~p", [now()])),
+    Md5 = erlang:md5(Str),
+    lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= Md5]).
