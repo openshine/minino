@@ -14,3 +14,5 @@
 		session}).
 
 -define(MSESSION, <<"msession">>).
+
+-define(DEFAULTSESSIONTIME, 604800).

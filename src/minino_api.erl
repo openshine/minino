@@ -14,7 +14,8 @@
 	 path/1,
 	 render_template/2,
 	 build_url/3,
-	 get_settings/1
+	 get_settings/1,
+	 get_session/1
 	]).
 
 -type template_path() :: string().
@@ -48,3 +49,8 @@ build_url(Id, Args, MReq) ->
 -spec get_settings(Req::term()) -> [term()].
 get_settings(MReq) ->
     MReq#mreq.mconf.
+
+%% @doc get minino session.
+-spec get_session(Req::term()) -> string()|undefined.
+get_session(MReq) ->
+    MReq#mreq.session.

@@ -22,10 +22,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--type rule() :: {Id::atom(), Path::[string()|atom()], View::atom()}.
-
-
-
 -define(SERVER, ?MODULE). 
 
 -record(state, {mapp,
@@ -315,7 +311,7 @@ build_url(Id, Args, DispRules) ->
     end.
 	
 
-get_path_loop([], Id)->
+get_path_loop([], _Id)->
     undefined; 
 get_path_loop([{Id, Path,_}|_], Id) ->
     Path;
