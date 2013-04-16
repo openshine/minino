@@ -16,3 +16,7 @@
 -define(MSESSION, <<"msession">>).
 
 -define(DEFAULTSESSIONTIME, 604800).
+
+-type template_path() :: string().
+-type template_args() :: [{atom(), string()}].
+-type minino_req() :: term().

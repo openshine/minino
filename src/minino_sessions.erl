@@ -16,7 +16,9 @@
 
 %% API
 -export([start_link/1]).
--export([get_or_create/1]).
+-export([get_or_create/1,
+	 get_cookie/2,
+	 set_cookie/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -51,6 +53,36 @@ start_link(Params) ->
 -spec get_or_create(MReq::term()) -> {ok, Session::string(), MReq1::term()} | {error, Reason::term()}.
 get_or_create(MReq) ->
     gen_server:call(?SERVER, {get_or_create, MReq}).
+
+
+
+%% @doc get cookie.
+-spec get_cookie(MReq::minino_req(), CookieName::string()) -> string()|undefined.
+get_cookie(MReq, CookieName) ->
+    CReq = MReq#mreq.creq,
+    CookieNameBin = list_to_binary(CookieName),
+    case cowboy_req:cookie(CookieNameBin, CReq) of
+    	{undefined, _CReq} -> undefined;
+    	{Cookie, _CReq} -> binary_to_list(Cookie)
+    end.
+    
+
+
+
+
+%% @doc set cookie.
+-spec set_cookie(MReq::minino_req(), CookieName::string(), CookieVal::string()) -> 
+			MReq1::minino_req() | {error, term()}.
+set_cookie(_MReq, ?MSESSION, _CookieVal) ->
+    {error, "reserved cookie name"};
+
+set_cookie(MReq, CookieName, CookieVal) ->
+    CReq = MReq#mreq.creq,
+    CReq1 = cowboy_req:set_resp_cookie(
+	      CookieName, 
+	      CookieVal, [], CReq),
+    MReq#mreq{creq=CReq1}.
+
 
 %%%===================================================================
 %%% gen_server callbacks
