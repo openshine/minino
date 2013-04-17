@@ -13,8 +13,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
--export([get/0, read_conf/0]).
+-export([start_link/1]).
+-export([get/0, read_file/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -35,8 +35,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Params) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, Params, []).
 
 get()->
     gen_server:call(?SERVER, get_conf).
@@ -56,9 +56,9 @@ get()->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    Conf = read_conf(),
-    {ok, #state{conf=Conf}}.
+init([MConf]) ->
+    %% Conf = read_conf(),
+    {ok, #state{conf=MConf}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -133,7 +133,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-read_conf()->
+read_file()->
     Filename = 
 	case application:get_env(minino, settings_file) of
 	    {ok, S} -> S;

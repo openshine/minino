@@ -20,14 +20,28 @@
 
 start(_StartType, _StartArgs) ->
     %% read mapp conf
-    {ok, MConf} = minino_config:read_conf(), 
+    {ok, MConf} = minino_config:read_file(), 
     Port = proplists:get_value(port, MConf, 8080),
-   
+    ConfMediaUrl = proplists:get_value(media_url, MConf, ["media"]),
+    ConfMediaPath = proplists:get_value(media_path, MConf, "priv/static"),
+    MediaUrl = "/" ++ string:join(ConfMediaUrl, "/") ++ "/[...]",
+    {ok, Cwd} = file:get_cwd(),
+    MediaPath = filename:join([Cwd, ConfMediaPath]),
+
     %% start cowboy
-    Dispatch = 
-    	cowboy_router:compile([
-    			       {'_', [{'_', minino_cowboy_handler, []} ]}
-    			      ]),
+    Dispatch = cowboy_router:compile([
+    				      {'_', [
+    					     {MediaUrl, 
+					      cowboy_static, 
+					      [{directory, MediaPath}, 
+					       {mimetypes, 
+						{fun mimetypes:path_to_mimes/2, default}}
+					      ]},
+					     {'_', 
+					      minino_cowboy_handler, 
+					      []}
+					    ]}
+    				     ]),
     {ok, _} = 
     	cowboy:start_http(http, 
     			  100,
