@@ -28,9 +28,16 @@
 
 -define(DB, ?MODULE).
 
--define(PURGETIME, 10). %% db purge time in seconds.
+-define(PURGETIME, 60). %% db purge time in seconds.
 
 -record(state, {sessiontime}).
+
+-record(session, {key, 
+		  dict, 
+		  new=true, 
+		  modified=true, 
+		  permanent=false, 
+		  time}).
 
 
 
@@ -67,9 +74,6 @@ get_cookie(MReq, CookieName) ->
     end.
     
 
-
-
-
 %% @doc set cookie.
 -spec set_cookie(MReq::minino_req(), CookieName::string(), CookieVal::string()) -> 
 			MReq1::minino_req() | {error, term()}.
@@ -101,7 +105,9 @@ set_cookie(MReq, CookieName, CookieVal) ->
 %%--------------------------------------------------------------------
 init([Mconf]) ->
     SessionTime = proplists:get_value(sessiontime, Mconf, ?DEFAULTSESSIONTIME),
-    ets:new(?DB, [set, named_table]),
+    ets:new(?DB, [set, 
+		  named_table,
+		  {keypos, #session.key}]),
     erlang:send_after(?PURGETIME*1000, self(), purge_db),
     {ok, #state{sessiontime=SessionTime}}.
 
@@ -121,34 +127,26 @@ init([Mconf]) ->
 %%--------------------------------------------------------------------
 handle_call({get_or_create, MReq}, _From, State) ->
     CReq = MReq#mreq.creq,
-    {StoredSession, CReq1} = cowboy_req:cookie(?MSESSION, CReq),
-    Session =
-	case  cowboy_req:path(CReq) of
+    {BrowserSessionKey, CReq1} = cowboy_req:cookie(?MSESSION, CReq),
+    {Session, CReq2} =
+	case cowboy_req:path(CReq) of
 	    {<<"/favicon.ico">>, _} -> 
-		undefined;
+		{#session{key=undefined, new=false}, CReq1};
 	    _Else ->
-		case StoredSession of
-		    undefined ->
-			not_valid;
-		    SessionBin ->
-			S = binary_to_list(SessionBin),
-			case has_expired(S) of
-			    true -> not_valid;
-			    false -> S
-			end
+		S = get_session(BrowserSessionKey, State#state.sessiontime),
+		io:format("session: ~p~n", [S]),
+		case S#session.new of
+		    true ->
+			NewCReq = 
+			    cowboy_req:set_resp_cookie(
+			      ?MSESSION, 
+			      S#session.key, [], CReq1),
+			{S, NewCReq};
+		    false ->
+			{S, CReq1}
 		end
 	end,
-    {Session1, CReq2} =
-	case Session of
-	    not_valid ->
-		NewSession = add_new_session(State#state.sessiontime),
-		R = cowboy_req:set_resp_cookie(
-		      ?MSESSION, 
-		      NewSession, [], CReq1),
-		{NewSession, R};
-	    Session -> {Session, CReq1}
-	end,
-    Reply =  {ok, Session1, MReq#mreq{creq=CReq2}},
+    Reply =  {ok, Session, MReq#mreq{creq=CReq2}},
     {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
@@ -222,26 +220,43 @@ random_md5() ->
     Md5 = erlang:md5(Str),
     lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= Md5]).
 
-add_new_session(SessionTime) ->
-    Session = random_md5(),
-    true = ets:insert(?DB, {Session, create_expired_time(SessionTime)}),
+
+
+get_session(undefined, SessionTime) ->
+    create_session(SessionTime);
+
+get_session(SessionKey, SessionTime) when is_binary(SessionKey) ->
+    get_session(binary_to_list(SessionKey), SessionTime);
+
+get_session(SessionKey, SessionTime) ->
+    %%check stored session
+    case ets:lookup(?DB, SessionKey) of
+	[] -> create_session(SessionTime);
+	[Session] ->
+	    Now = now_secs(),
+	    case Session#session.time of
+		Time when Time < Now -> 
+		    ets:delete(?DB, Session),
+		    create_session(SessionTime);
+		_E ->
+		    Session#session{new=false}
+	    end
+    end.
+
+
+    
+create_session(SessionTime) ->
+    Key = random_md5(),
+    Dict = dict:new(),
+    Time = create_expired_time(SessionTime),
+    Session = #session{key=Key, dict=Dict, time=Time},
+    true = ets:insert(?DB, Session),
     Session.
 
+
 create_expired_time(SessionTime) ->
-    %% {Mega, Secs, _Mili} = now(),
-    %% Timestamp = Mega*1000000 + Secs + SessionTime. 
     now_secs() + SessionTime.
 
-has_expired(Session) ->
-    Now = now_secs(),
-    case ets:lookup(?DB, Session) of
-	[] -> true;
-	[{Session, Time}] when Time < Now -> 
-	    ets:delete(?DB, Session),
-	    true;
-	_E -> 
-	    false
-    end.
 
 
 now_secs() ->
@@ -251,5 +266,6 @@ now_secs() ->
 
 purge_db() ->
     Now =  now_secs(),
-    MatchSpec = [{{'$1','$2'},[{'=<','$2', Now}],[true]}],
+    Tuple = #session{time='$1', _='_'},
+    MatchSpec = [{Tuple,[{'=<','$1', Now}],[true]}],
     ets:select_delete(?DB, MatchSpec).
