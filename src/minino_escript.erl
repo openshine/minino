@@ -168,7 +168,8 @@ create_app(AppName) ->
 	    ignore;
 	false ->
 	    SetBin = get_bin("template.settings.cfg"),
-	    SetCtx = dict:from_list([{application, AppName}]),
+	    SetCtx = dict:from_list([{application, AppName},
+				     {random_string, create_random_string()}]),
 	    SetStr = render(binary_to_list(SetBin), SetCtx),
 	    filelib:ensure_dir(SettingsFileName),
 	    file:write_file(SettingsFileName, list_to_binary(SetStr))
@@ -217,3 +218,17 @@ render(Bin, Context) ->
     Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
     mustache:render(Str1, Context).
 
+
+create_random_string()->
+       create_random_string(50, 1, []).
+
+create_random_string(Length, Counter, Acc) when Length == Counter ->
+    io:format("acc: ~p~n", [Acc]),
+    Acc;
+
+create_random_string(Length, Counter, Acc)->
+    FirstChar = 64,
+    LastChar = 122,
+    Char = random:uniform(LastChar - FirstChar + 1) + FirstChar - 1,
+    create_random_string(Length, Counter + 1, [Char|Acc]).
+    
