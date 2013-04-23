@@ -13,9 +13,8 @@
 		file,
 		session}).
 
--define(MSESSION, <<"msession">>).
-
 -define(DEFAULTSESSIONTIME, 604800).
+-define(DEFAULTSESSIONNAME, "msession").
 
 -type template_path() :: string().
 -type template_args() :: [{atom(), string()}].

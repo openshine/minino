@@ -30,13 +30,15 @@
 
 -define(PURGETIME, 60). %% db purge time in seconds.
 
--record(state, {sessiontime}).
+-record(state, {session_time,
+		secret_key,
+		session_name
+	       }).
 
 -record(session, {key, 
 		  dict, 
 		  new=true, 
 		  modified=true, 
-		  permanent=false, 
 		  time}).
 
 
@@ -104,12 +106,23 @@ set_cookie(MReq, CookieName, CookieVal) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Mconf]) ->
-    SessionTime = proplists:get_value(sessiontime, Mconf, ?DEFAULTSESSIONTIME),
+    SessionTime = proplists:get_value(session_time, Mconf, ?DEFAULTSESSIONTIME),
+    SecretKey = 
+	case proplists:get_value(secret_key, Mconf, error) of
+	    S when S /= error ->
+		S
+	end,
+    SessionName =  proplists:get_value(session_cookie_name, 
+				       Mconf, 
+				       ?DEFAULTSESSIONNAME), 
     ets:new(?DB, [set, 
 		  named_table,
 		  {keypos, #session.key}]),
     erlang:send_after(?PURGETIME*1000, self(), purge_db),
-    {ok, #state{sessiontime=SessionTime}}.
+    {ok, #state{session_time=SessionTime,
+		secret_key=SecretKey,
+		session_name=SessionName
+	       }}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -127,13 +140,13 @@ init([Mconf]) ->
 %%--------------------------------------------------------------------
 handle_call({get_or_create, MReq}, _From, State) ->
     CReq = MReq#mreq.creq,
-    {BrowserSessionKey, CReq1} = cowboy_req:cookie(?MSESSION, CReq),
+    {BrowserSessionKey, CReq1} = cowboy_req:cookie(State#state.session_name, CReq),
     {Session, CReq2} =
 	case cowboy_req:path(CReq) of
 	    {<<"/favicon.ico">>, _} -> 
 		{#session{key=undefined, new=false}, CReq1};
 	    _Else ->
-		S = get_session(BrowserSessionKey, State#state.sessiontime),
+		S = get_session(BrowserSessionKey, State),
 		io:format("session: ~p~n", [S]),
 		case S#session.new of
 		    true ->
@@ -215,29 +228,28 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 
-random_md5() ->
+random_md5(SecrectKey) ->
     Str = lists:flatten(io_lib:format("~p", [now()])),
-    Md5 = erlang:md5(Str),
+    Md5 = erlang:md5(Str ++ SecrectKey),
     lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= Md5]).
 
 
 
-get_session(undefined, SessionTime) ->
-    create_session(SessionTime);
+get_session(undefined, State) ->
+    create_session(State);
 
-get_session(SessionKey, SessionTime) when is_binary(SessionKey) ->
-    get_session(binary_to_list(SessionKey), SessionTime);
+get_session(SessionKey, State) when is_binary(SessionKey) ->
+    get_session(binary_to_list(SessionKey), State);
 
-get_session(SessionKey, SessionTime) ->
-    %%check stored session
+get_session(SessionKey, State) ->
     case ets:lookup(?DB, SessionKey) of
-	[] -> create_session(SessionTime);
+	[] -> create_session(State);
 	[Session] ->
 	    Now = now_secs(),
 	    case Session#session.time of
 		Time when Time < Now -> 
 		    ets:delete(?DB, Session),
-		    create_session(SessionTime);
+		    create_session(State);
 		_E ->
 		    Session#session{new=false}
 	    end
@@ -245,11 +257,14 @@ get_session(SessionKey, SessionTime) ->
 
 
     
-create_session(SessionTime) ->
-    Key = random_md5(),
+create_session(State) ->
+    SessionTime = State#state.session_time,
+    Key = random_md5(State#state.secret_key),
     Dict = dict:new(),
     Time = create_expired_time(SessionTime),
-    Session = #session{key=Key, dict=Dict, time=Time},
+    Session = #session{key=Key, 
+		       dict=Dict, 
+		       time=Time},
     true = ets:insert(?DB, Session),
     Session.
 
@@ -257,12 +272,9 @@ create_session(SessionTime) ->
 create_expired_time(SessionTime) ->
     now_secs() + SessionTime.
 
-
-
 now_secs() ->
     {Mega, Secs, _Mili} = now(),
     Mega*1000000 + Secs.
-
 
 purge_db() ->
     Now =  now_secs(),
