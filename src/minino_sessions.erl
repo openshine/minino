@@ -12,8 +12,6 @@
 
 -behaviour(gen_server).
 
-
-
 %% API
 -export([start_link/1]).
 -export([get_or_create/1,
@@ -32,7 +30,11 @@
 
 -record(state, {session_time,
 		secret_key,
-		session_name
+		session_name,
+		session_cookie_httponly,
+		session_cookie_domain,
+		session_cookie_path,
+		session_cookie_secure
 	       }).
 
 -record(session, {key, 
@@ -40,8 +42,6 @@
 		  new=true, 
 		  modified=true, 
 		  time}).
-
-
 
 %%%===================================================================
 %%% API
@@ -61,7 +61,7 @@ start_link(Params) ->
 %% @doc get or create session.
 -spec get_or_create(MReq::term()) -> {ok, Session::string(), MReq1::term()} | {error, Reason::term()}.
 get_or_create(MReq) ->
-    gen_server:call(?SERVER, {get_or_create, MReq}).
+    gen_server:call(?SERVER, {get_or_create_session, MReq}).
 
 
 
@@ -79,16 +79,12 @@ get_cookie(MReq, CookieName) ->
 %% @doc set cookie.
 -spec set_cookie(MReq::minino_req(), CookieName::string(), CookieVal::string()) -> 
 			MReq1::minino_req() | {error, term()}.
-set_cookie(_MReq, ?MSESSION, _CookieVal) ->
-    {error, "reserved cookie name"};
-
 set_cookie(MReq, CookieName, CookieVal) ->
     CReq = MReq#mreq.creq,
     CReq1 = cowboy_req:set_resp_cookie(
 	      CookieName, 
 	      CookieVal, [], CReq),
     MReq#mreq{creq=CReq1}.
-
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -106,22 +102,41 @@ set_cookie(MReq, CookieName, CookieVal) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Mconf]) ->
-    SessionTime = proplists:get_value(session_time, Mconf, ?DEFAULTSESSIONTIME),
+     SessionTime = proplists:get_value(session_time, Mconf, ?DEFAULTSESSIONTIME),
     SecretKey = 
-	case proplists:get_value(secret_key, Mconf, error) of
-	    S when S /= error ->
-		S
+    	case proplists:get_value(secret_key, Mconf, error) of
+    	    S when S /= error ->
+    		S
+    	end,
+    SessionName = list_to_binary(
+		    proplists:get_value(session_cookie_name, 
+					Mconf, 
+					?DEFAULTSESSIONNAME)), 
+    HttpOnly = proplists:get_value(session_cookie_httponly, Mconf, true),
+    SessionDomain =
+	case proplists:get_value(session_cookie_domain, Mconf, none) of
+	    SDomain when is_list(SDomain) ->
+		list_to_binary(SDomain);
+	    SDomain -> SDomain
 	end,
-    SessionName =  proplists:get_value(session_cookie_name, 
-				       Mconf, 
-				       ?DEFAULTSESSIONNAME), 
+    SessionPath =
+	case proplists:get_value(session_cookie_path, Mconf, none) of
+	     SPath when is_list(SPath) ->
+		list_to_binary(SPath);
+	    SPath -> SPath
+	end,
+    SessionSecure =  proplists:get_value(session_cookie_secure, Mconf, false),
     ets:new(?DB, [set, 
 		  named_table,
 		  {keypos, #session.key}]),
-    erlang:send_after(?PURGETIME*1000, self(), purge_db),
+    %% erlang:send_after(?PURGETIME*1000, self(), purge_db),
     {ok, #state{session_time=SessionTime,
 		secret_key=SecretKey,
-		session_name=SessionName
+		session_name=SessionName,
+		session_cookie_httponly=HttpOnly,
+		session_cookie_domain=SessionDomain,
+		session_cookie_path=SessionPath,
+		session_cookie_secure=SessionSecure
 	       }}.
 
 %%--------------------------------------------------------------------
@@ -138,28 +153,8 @@ init([Mconf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({get_or_create, MReq}, _From, State) ->
-    CReq = MReq#mreq.creq,
-    {BrowserSessionKey, CReq1} = cowboy_req:cookie(State#state.session_name, CReq),
-    {Session, CReq2} =
-	case cowboy_req:path(CReq) of
-	    {<<"/favicon.ico">>, _} -> 
-		{#session{key=undefined, new=false}, CReq1};
-	    _Else ->
-		S = get_session(BrowserSessionKey, State),
-		io:format("session: ~p~n", [S]),
-		case S#session.new of
-		    true ->
-			NewCReq = 
-			    cowboy_req:set_resp_cookie(
-			      ?MSESSION, 
-			      S#session.key, [], CReq1),
-			{S, NewCReq};
-		    false ->
-			{S, CReq1}
-		end
-	end,
-    Reply =  {ok, Session, MReq#mreq{creq=CReq2}},
+handle_call({get_or_create_session, MReq}, _From, State) ->
+    Reply =  get_or_create_session(MReq, State),
     {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
@@ -226,7 +221,31 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+get_or_create_session(MReq, State) ->
+    CReq = MReq#mreq.creq,
+    {BrowserSessionKey, CReq1} = cowboy_req:cookie(State#state.session_name, CReq),
+    {Session, CReq2} =
+	case cowboy_req:path(CReq) of
+	    {<<"/favicon.ico">>, _} -> 
+		{#session{key=undefined, new=false}, CReq1};
+	    _Else ->
+		S = get_session(BrowserSessionKey, State),
+		CowBoyCookieOps = create_cowboy_cookie_ops(State),
+		case S#session.new of
+		    true ->
+			NewCReq = 
+			    cowboy_req:set_resp_cookie(
+			      State#state.session_name, 
+			      S#session.key, 
+			      CowBoyCookieOps, 
+			      CReq1),
+			{S, NewCReq};
+		    false ->
+			{S, CReq1}
+		end
+	end,
 
+  {ok, Session, MReq#mreq{creq=CReq2}}.
 
 random_md5(SecrectKey) ->
     Str = lists:flatten(io_lib:format("~p", [now()])),
@@ -281,3 +300,29 @@ purge_db() ->
     Tuple = #session{time='$1', _='_'},
     MatchSpec = [{Tuple,[{'=<','$1', Now}],[true]}],
     ets:select_delete(?DB, MatchSpec).
+
+create_cowboy_cookie_ops(State)->
+    HttpOnly = State#state.session_cookie_httponly,
+    Ops = 
+	[
+	 {http_only, HttpOnly},
+	 {secure, true} 
+	],
+
+    Ops1 = 
+	case State#state.session_cookie_domain of
+	    none -> Ops;
+	    SessionDomain ->
+		[{domain, SessionDomain}|Ops]
+	end,
+    Ops2 = case State#state.session_cookie_path of
+	       none -> Ops1;
+	       SessionPath ->
+		   [{path, SessionPath}|Ops1]
+	   end,
+    case State#state.session_cookie_secure of
+	true ->
+	    [{secure, true}|Ops2];
+	_Else -> Ops2
+    end.
+    

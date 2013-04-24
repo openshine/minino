@@ -223,7 +223,6 @@ create_random_string()->
        create_random_string(50, 1, []).
 
 create_random_string(Length, Counter, Acc) when Length == Counter ->
-    io:format("acc: ~p~n", [Acc]),
     Acc;
 
 create_random_string(Length, Counter, Acc)->
