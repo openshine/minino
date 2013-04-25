@@ -15,9 +15,10 @@
 	 render_template/2,
 	 build_url/3,
 	 get_settings/1,
-	 get_session/1,
 	 get_cookie/2,
-	 set_cookie/3
+	 set_cookie/3,
+	 get_session_dict/1,
+	 update_session_dict/2
 	]).
 
 
@@ -43,16 +44,29 @@ build_url(Id, Args, MReq) ->
     F = MReq#mreq.build_url_fun,
     F(Id, Args).
 
-
 %% @doc get minino settings.
--spec get_settings(MReq::minino_req()) -> [term()].
+-spec get_settings(MReq::minino_req()) -> [term()]. 
 get_settings(MReq) ->
     MReq#mreq.mconf.
 
-%% @doc get minino session.
--spec get_session(MReq::minino_req()) -> string()|undefined.
-get_session(MReq) ->
-    MReq#mreq.session.
+
+
+
+%% Sessions
+
+%% @doc get minino session dict.
+-spec get_session_dict(MReq::minino_req()) -> dict().
+get_session_dict(MReq) ->
+    minino_sessions:get_dict(MReq).
+
+    
+%% @doc update minino session dict.
+-spec update_session_dict(MReq::minino_req(), Dict::dict()) -> 
+				 {ok, MReq1::minino_req()} | {error, Error::term()}.
+update_session_dict(MReq, Dict) ->
+    minino_sessions:update_dict(MReq, Dict).
+
+
 
 %% @doc get cookie.
 -spec get_cookie(MReq::minino_req(), CookieName::string()) -> string()|undefined.

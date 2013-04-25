@@ -16,7 +16,10 @@
 -export([start_link/1]).
 -export([get_or_create/1,
 	 get_cookie/2,
-	 set_cookie/3]).
+	 set_cookie/3,
+	 get_dict/1,
+	 update_dict/2
+]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -86,6 +89,22 @@ set_cookie(MReq, CookieName, CookieVal) ->
 	      CookieVal, [], CReq),
     MReq#mreq{creq=CReq1}.
 
+
+
+
+%% @doc get minino session dict.
+-spec get_dict(MReq::minino_req()) -> Dict::dict().
+get_dict(MReq) ->
+    gen_server:call(?SERVER, {get_dict, MReq}).
+
+%% @doc update minino session dict.
+-spec update_dict(MReq::minino_req(), Dict::dict()) -> 
+				 {ok, MReq1::minino_req()} | {error, Error::term()}.
+update_dict(MReq, Dict) ->
+    gen_server:call(?SERVER, {update_dict, MReq, Dict}).
+    
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -153,6 +172,14 @@ init([Mconf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({get_dict, MReq}, _From, State) ->
+    Reply =  get_dict_db(MReq),
+    {reply, Reply, State};
+
+handle_call({update_dict, MReq, Dict}, _From, State) ->
+    Reply =  update_dict_db(MReq, Dict),
+    {reply, Reply, State};
+
 handle_call({get_or_create_session, MReq}, _From, State) ->
     Reply =  get_or_create_session(MReq, State),
     {reply, Reply, State};
@@ -326,3 +353,25 @@ create_cowboy_cookie_ops(State)->
 	_Else -> Ops2
     end.
     
+update_dict_db(MReq, Dict)->
+    Session = MReq#mreq.session,
+    Key = Session#session.key,
+    case ets:lookup(?DB, Key) of
+	[] -> {error, "session not found"};
+	[_S] -> 
+	    NewSession = Session#session{modified=true,
+					 new=false,
+					 dict=Dict},
+	    true = ets:insert(?DB, NewSession),
+	    {ok, MReq#mreq{session=NewSession}}
+    end.
+	    
+	    
+
+get_dict_db(MReq) ->
+    Session = MReq#mreq.session,
+    Key = Session#session.key,
+    case ets:lookup(?DB, Key) of
+	[] -> {error, "session not found"};
+	[S] -> S#session.dict
+    end.

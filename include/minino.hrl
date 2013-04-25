@@ -19,3 +19,4 @@
 -type template_path() :: string().
 -type template_args() :: [{atom(), string()}].
 -type minino_req() :: term().
+%% -type dict() :: term().
