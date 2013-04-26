@@ -50,15 +50,46 @@ end_per_testcase(_Test, _Config) ->
 %%======================================================
 
 tests(_Config) ->
-    ping(),
+    Url = "http://127.0.0.1:8000",
+    ok = ping(Url),
+    io:format("test ping: ~p -> ok", [Url]),
+    Cookie = check_cookies(Url),
+    io:format("check cookies: ~p~n", [Cookie]),
     ok.
 
-ping() ->  
-    {ok, R} = httpc:request("http://127.0.0.1:8000"),
-    {{_,200,_},_,_} = R,
-    io:format("test ping: http://127.0.0.1:8000 -> ok"),
+ping(Url) ->  
+    {ok, R} = httpc:request(Url),
+    {{_,200,_},_Headers,_Body} = R,
     ok.
 
+check_cookies(Url) ->
+    {ok, R} = httpc:request(Url),
+    {{_,200,_},Headers,_Body} = R,
+    {ok, Cookie} = get_cookie(Headers),
+    io:format("cookie: ~p~n", [Cookie]),
+    Request = {Url, [{"Cookie", "msession=" ++ Cookie}]},
+    {ok, R1} = httpc:request(get, Request, [], []),
+    {{_,200,_},Headers1,_Body1} = R1,
+    error = get_cookie(Headers1),
+    Cookie.
+
+get_cookie(Headers) ->
+    case proplists:get_value("set-cookie", Headers) of
+	undefined -> error;
+	Val ->
+	  get_cookie_loop(string:tokens(Val, "; "))
+    end.
+
+get_cookie_loop([])->
+    error;
+
+get_cookie_loop([H|T])->
+    case string:tokens(H, "=") of
+	["msession", Cookie] ->
+	    {ok, Cookie};
+	_Else ->
+	   get_cookie_loop(T) 
+    end.
 
 %%======================================================
 %% Simple Tests
@@ -122,6 +153,5 @@ check_build_urls() ->
     io:format("~p path -> ~p", [root_page, F(root_page, [])]),
     io:format("~p path -> ~p", [home_page, F(home_page, [])]),
     io:format("~p path -> ~p", [test_page, F(test_page, [{testvalue, "data"}])]),
-
     ok.
     
