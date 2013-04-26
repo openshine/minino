@@ -19,4 +19,8 @@
 -type template_path() :: string().
 -type template_args() :: [{atom(), string()}].
 -type minino_req() :: term().
-%% -type dict() :: term().
+
+
+
+-define(DBG(Str, P), io:format(Str, P)).
+-define(DBG(Str), io:format(Str)).

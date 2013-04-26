@@ -40,11 +40,19 @@
 		session_cookie_secure
 	       }).
 
--record(session, {key, 
-		  dict, 
-		  new=true, 
-		  modified=true, 
-		  time}).
+%% -record(session, {key, 
+%% 		  dict, 
+%% 		  new=true, 
+%% 		  modified=true, 
+%% 		  time}).
+
+
+
+
+-record(mreq_session, {new, key, modified}).
+-record(stored_session, {key, dict, time}).
+
+
 
 %%%===================================================================
 %%% API
@@ -121,7 +129,7 @@ update_dict(MReq, Dict) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Mconf]) ->
-     SessionTime = proplists:get_value(session_time, Mconf, ?DEFAULTSESSIONTIME),
+    SessionTime = proplists:get_value(session_time, Mconf, ?DEFAULTSESSIONTIME),
     SecretKey = 
     	case proplists:get_value(secret_key, Mconf, error) of
     	    S when S /= error ->
@@ -140,15 +148,15 @@ init([Mconf]) ->
 	end,
     SessionPath =
 	case proplists:get_value(session_cookie_path, Mconf, none) of
-	     SPath when is_list(SPath) ->
+	    SPath when is_list(SPath) ->
 		list_to_binary(SPath);
 	    SPath -> SPath
 	end,
     SessionSecure =  proplists:get_value(session_cookie_secure, Mconf, false),
+    ask_purge_db(?PURGETIME),
     ets:new(?DB, [set, 
 		  named_table,
-		  {keypos, #session.key}]),
-    %% erlang:send_after(?PURGETIME*1000, self(), purge_db),
+		  {keypos, #stored_session.key}]),
     {ok, #state{session_time=SessionTime,
 		secret_key=SecretKey,
 		session_name=SessionName,
@@ -213,7 +221,7 @@ handle_cast(_Msg, State) ->
 %%--------------------------------------------------------------------
 handle_info(purge_db, State) ->
     purge_db(),
-    erlang:send_after(?PURGETIME*1000, self(), purge_db),
+    ask_purge_db(?PURGETIME),
     {noreply, State};
 
 handle_info(_Info, State) ->
@@ -251,53 +259,68 @@ code_change(_OldVsn, State, _Extra) ->
 get_or_create_session(MReq, State) ->
     CReq = MReq#mreq.creq,
     {BrowserSessionKey, CReq1} = cowboy_req:cookie(State#state.session_name, CReq),
-    {Session, CReq2} =
+    {MreqSession, CReq2} =
 	case cowboy_req:path(CReq) of
 	    {<<"/favicon.ico">>, _} -> 
-		{#session{key=undefined, new=false}, CReq1};
-	    _Else ->
-		S = get_session(BrowserSessionKey, State),
-		CowBoyCookieOps = create_cowboy_cookie_ops(State),
-		case S#session.new of
-		    true ->
+		{#mreq_session{key=undefined, new=false}, CReq1};
+	    {_Path, _Creq} ->
+		StoredSes = get_session(BrowserSessionKey),
+		case StoredSes of
+		    undefined ->
+			NewStoredSession = create_session(State),
+			CowBoyCookieOps = create_cowboy_cookie_ops(State),
+			Key = NewStoredSession#stored_session.key,
 			NewCReq = 
 			    cowboy_req:set_resp_cookie(
 			      State#state.session_name, 
-			      S#session.key, 
+			      Key, 
 			      CowBoyCookieOps, 
 			      CReq1),
-			{S, NewCReq};
-		    false ->
-			{S, CReq1}
+			MReqSes = 
+			    #mreq_session{key=Key, 
+					  new=true,
+					  modified=true
+					 },
+			{MReqSes, NewCReq};
+		    StoredSes ->
+			Key = StoredSes#stored_session.key,
+			MReqSes = 	 
+			    #mreq_session{key=Key, 
+					  new=false,
+					  modified=false},
+			
+			{MReqSes, CReq1}
 		end
 	end,
+    MReq1 = MReq#mreq{creq=CReq2,
+		     session=MreqSession},
+    {ok, MReq1}.
 
-  {ok, Session, MReq#mreq{creq=CReq2}}.
-
-random_md5(SecrectKey) ->
+create_key(SecrectKey) ->
     Str = lists:flatten(io_lib:format("~p", [now()])),
     Md5 = erlang:md5(Str ++ SecrectKey),
     lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= Md5]).
 
 
 
-get_session(undefined, State) ->
-    create_session(State);
+get_session(undefined) ->
+    undefined;
 
-get_session(SessionKey, State) when is_binary(SessionKey) ->
-    get_session(binary_to_list(SessionKey), State);
+get_session(SessionKey) when is_binary(SessionKey) ->
+    get_session(binary_to_list(SessionKey));
 
-get_session(SessionKey, State) ->
+get_session(SessionKey) ->
     case ets:lookup(?DB, SessionKey) of
-	[] -> create_session(State);
-	[Session] ->
+	[] -> undefined;
+	[StoredSession] ->
 	    Now = now_secs(),
-	    case Session#session.time of
+	    case StoredSession#stored_session.time of
 		Time when Time < Now -> 
-		    ets:delete(?DB, Session),
-		    create_session(State);
+		    Key = StoredSession#stored_session.key,
+		    ets:delete(?DB, Key),
+		    undefined;
 		_E ->
-		    Session#session{new=false}
+		    StoredSession
 	    end
     end.
 
@@ -305,14 +328,14 @@ get_session(SessionKey, State) ->
     
 create_session(State) ->
     SessionTime = State#state.session_time,
-    Key = random_md5(State#state.secret_key),
+    Key = create_key(State#state.secret_key),
     Dict = dict:new(),
     Time = create_expired_time(SessionTime),
-    Session = #session{key=Key, 
+    StoredSession = #stored_session{key=Key, 
 		       dict=Dict, 
 		       time=Time},
-    true = ets:insert(?DB, Session),
-    Session.
+    true = ets:insert(?DB, StoredSession),
+    StoredSession.
 
 
 create_expired_time(SessionTime) ->
@@ -324,7 +347,7 @@ now_secs() ->
 
 purge_db() ->
     Now =  now_secs(),
-    Tuple = #session{time='$1', _='_'},
+    Tuple = #stored_session{time='$1', _='_'},
     MatchSpec = [{Tuple,[{'=<','$1', Now}],[true]}],
     ets:select_delete(?DB, MatchSpec).
 
@@ -332,8 +355,7 @@ create_cowboy_cookie_ops(State)->
     HttpOnly = State#state.session_cookie_httponly,
     Ops = 
 	[
-	 {http_only, HttpOnly},
-	 {secure, true} 
+	 {http_only, HttpOnly}
 	],
 
     Ops1 = 
@@ -352,26 +374,31 @@ create_cowboy_cookie_ops(State)->
 	    [{secure, true}|Ops2];
 	_Else -> Ops2
     end.
-    
+
+
+
 update_dict_db(MReq, Dict)->
-    Session = MReq#mreq.session,
-    Key = Session#session.key,
+    MReqSession = MReq#mreq.session,
+    Key = MReqSession#mreq_session.key,
     case ets:lookup(?DB, Key) of
 	[] -> {error, "session not found"};
-	[_S] -> 
-	    NewSession = Session#session{modified=true,
-					 new=false,
-					 dict=Dict},
-	    true = ets:insert(?DB, NewSession),
-	    {ok, MReq#mreq{session=NewSession}}
+	[StoredSes] -> 
+	    NewStoredSession = StoredSes#stored_session{dict=Dict},
+	    true = ets:insert(?DB, NewStoredSession),
+	    NewMReqSes = MReqSession#mreq_session{new=false, modified=true},
+	    {ok, NewMReqSes}
     end.
-	    
-	    
+
+
 
 get_dict_db(MReq) ->
-    Session = MReq#mreq.session,
-    Key = Session#session.key,
+    MReqSession = MReq#mreq.session,
+    Key = MReqSession#mreq_session.key,
     case ets:lookup(?DB, Key) of
 	[] -> {error, "session not found"};
-	[S] -> S#session.dict
+	[S] -> S#stored_session.dict
     end.
+
+
+ask_purge_db(TimeSecs) ->
+  erlang:send_after(TimeSecs*1000, self(), purge_db).
