@@ -18,7 +18,11 @@
 	 get_cookie/2,
 	 set_cookie/3,
 	 get_session_dict/1,
-	 update_session_dict/2
+	 update_session_dict/2,
+	 get_session_cookie_domain/0,
+	 get_session_cookie_httponly/0,
+	 get_session_cookie_path/0,
+	 get_session_cookie_secure/0
 	]).
 
 
@@ -59,7 +63,7 @@ get_settings(MReq) ->
 get_session_dict(MReq) ->
     minino_sessions:get_dict(MReq).
 
-    
+
 %% @doc update minino session dict.
 -spec update_session_dict(MReq::minino_req(), Dict::dict()) -> 
 				 {ok, MReq1::minino_req()} | {error, Error::term()}.
@@ -79,4 +83,25 @@ get_cookie(MReq, CookieName) ->
 set_cookie(MReq, CookieName, CookieVal) ->
     minino_sessions:set_cookie(MReq, CookieName, CookieVal).
 
+%% @doc get session cookie domain
+-spec get_session_cookie_domain() -> string().
+get_session_cookie_domain() ->
+    minino_sessions:get_session_cookie_domain().
+
+
+%% @doc get session cookie httponly
+-spec get_session_cookie_httponly() ->  true | false.
+get_session_cookie_httponly() ->
+    minino_sessions:get_session_cookie_httponly().
+
+
+%% @doc get session cookie path
+-spec get_session_cookie_path() ->  string().
+get_session_cookie_path() ->
+    minino_sessions:get_session_cookie_path().
+
+%% @doc get session cookie secure
+-spec get_session_cookie_secure() ->  true | false.
+get_session_cookie_secure() ->
+    minino_sessions:get_session_cookie_secure().
 

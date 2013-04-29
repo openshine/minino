@@ -18,7 +18,11 @@
 	 get_cookie/2,
 	 set_cookie/3,
 	 get_dict/1,
-	 update_dict/2
+	 update_dict/2,
+	 get_session_cookie_domain/0,
+	 get_session_cookie_httponly/0,
+	 get_session_cookie_path/0,
+	 get_session_cookie_secure/0
 ]).
 
 %% gen_server callbacks
@@ -39,15 +43,6 @@
 		session_cookie_path,
 		session_cookie_secure
 	       }).
-
-%% -record(session, {key, 
-%% 		  dict, 
-%% 		  new=true, 
-%% 		  modified=true, 
-%% 		  time}).
-
-
-
 
 -record(mreq_session, {new, key, modified}).
 -record(stored_session, {key, dict, time}).
@@ -110,7 +105,26 @@ get_dict(MReq) ->
 				 {ok, MReq1::minino_req()} | {error, Error::term()}.
 update_dict(MReq, Dict) ->
     gen_server:call(?SERVER, {update_dict, MReq, Dict}).
-    
+
+%% @doc get session cookie domain
+-spec get_session_cookie_domain() -> string().
+get_session_cookie_domain() ->
+    gen_server:call(?SERVER, get_session_cookie_domain).
+
+%% @doc get session cookie httponly
+-spec get_session_cookie_httponly() ->  true | false.
+get_session_cookie_httponly() ->
+    gen_server:call(?SERVER, get_session_cookie_httponly).   
+
+%% @doc get session cookie path
+-spec get_session_cookie_path() ->  string().
+get_session_cookie_path() ->
+    gen_server:call(?SERVER, get_session_cookie_path).   
+
+%% @doc get session cookie secure
+-spec get_session_cookie_secure() ->  true | false.
+get_session_cookie_secure() ->
+    gen_server:call(?SERVER, get_session_cookie_secure).   
 
 
 %%%===================================================================
@@ -192,8 +206,20 @@ handle_call({get_or_create_session, MReq}, _From, State) ->
     Reply =  get_or_create_session(MReq, State),
     {reply, Reply, State};
 
-handle_call(_Request, _From, State) ->
-    Reply = ok,
+handle_call(get_session_cookie_httponly, _From, State) ->
+    Reply = State#state.session_cookie_httponly,
+    {reply, Reply, State};
+
+handle_call(get_session_cookie_path, _From, State) ->
+    Reply = State#state.session_cookie_path,
+    {reply, Reply, State};
+
+handle_call(get_session_cookie_secure, _From, State) ->
+    Reply = State#state.session_cookie_secure,
+    {reply, Reply, State};
+
+handle_call(get_session_cookie_domain, _From, State) ->
+    Reply = State#state.session_cookie_domain,
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
