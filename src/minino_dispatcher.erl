@@ -31,7 +31,6 @@
 	       }).
 
 
-%% -compile([export_all]).
 
 %%%===================================================================
 %%% API
@@ -102,19 +101,20 @@ init([MConf]) ->
 %%--------------------------------------------------------------------
 handle_call({dispatch, MReq}, From, State) ->
     %% create worker process
+    WSpec = {make_ref(), 
+	     {minino_req_worker, start_link, []}, 
+	     permanent, 
+	     5000, 
+	     worker, 
+	     dynamic},
+    {ok, Pid} = supervisor:start_child(minino_dispatcher_sup, WSpec),
     Params = [MReq, 
 	      State#state.mapp, 
 	      State#state.match_fun,  
 	      State#state.build_url_fun,
 	      State#state.mconf, 
 	      From],
-    WSpec = {make_ref(), 
-	     {minino_req_worker, start_link, [Params]}, 
-	     permanent, 
-	     5000, 
-	     worker, 
-	     dynamic},
-    {_, {normal_stop, _}} = supervisor:start_child(minino_dispatcher_sup, WSpec),
+    gen_server:cast(Pid, {work, Params}),
     {noreply, State};
 
 handle_call(update_rules, _From, State) ->

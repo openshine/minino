@@ -21,7 +21,6 @@ init(_Transport, CReq, []) ->
 
 handle(CReq, State) ->
     {ok, MReq} = minino_sessions:get_or_create(#mreq{creq=CReq}),
-    %% MReq1 = write_multipart_to_file(MReq),
     MReq2 = minino_dispatcher:dispatch(MReq),
     CReqRespose = MReq2#mreq.creq,
     {ok, CReqRespose, State}.
