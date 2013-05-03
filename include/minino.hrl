@@ -11,7 +11,8 @@
 		build_url_fun,
 		mconf,
 		file,
-		session}).
+		session,
+		from}).
 
 -define(DEFAULTSESSIONTIME, 604800).
 -define(DEFAULTSESSIONNAME, "msession").

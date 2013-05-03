@@ -13,7 +13,7 @@
 %% API
 -export([start_link/1,
 	 dispatch/1,
-	 response/2,
+	 response/3,
 	 update_rules/0,
 	 create_match_fun/1,
 	 create_build_url_fun/1]).
@@ -48,12 +48,12 @@ start_link(Params) ->
 
 
 dispatch(MReq) ->
-    gen_server:call(?SERVER, {dispatch, MReq}).
+    Ref = make_ref(),
+    gen_server:cast(?SERVER, {dispatch, MReq, self(), Ref}),
+    Ref.
 
-
-response(To, MResponse) ->
-    gen_server:reply(To, MResponse).
-
+response(To, MResponse, Ref) ->
+    To ! {response, Ref, MResponse}.
 
 update_rules() ->
     gen_server:call(?SERVER, update_rules).
@@ -99,24 +99,6 @@ init([MConf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({dispatch, MReq}, From, State) ->
-    %% create worker process
-    WSpec = {make_ref(), 
-	     {minino_req_worker, start_link, []}, 
-	     permanent, 
-	     5000, 
-	     worker, 
-	     dynamic},
-    {ok, Pid} = supervisor:start_child(minino_dispatcher_sup, WSpec),
-    Params = [MReq, 
-	      State#state.mapp, 
-	      State#state.match_fun,  
-	      State#state.build_url_fun,
-	      State#state.mconf, 
-	      From],
-    gen_server:cast(Pid, {work, Params}),
-    {noreply, State};
-
 handle_call(update_rules, _From, State) ->
     MApp =State#state.mapp,
     R = MApp:dispatch_rules(),
@@ -138,6 +120,24 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 
+handle_cast({dispatch, MReq, From, Ref}, State) ->
+    %% create worker process
+    WSpec = {make_ref(), 
+    	     {minino_req_worker, start_link, []}, 
+    	     permanent, 
+	     5000, 
+	     worker, 
+	     dynamic},
+    {ok, Pid} = supervisor:start_child(minino_dispatcher_sup, WSpec),
+    Params = [MReq, 
+    	      State#state.mapp, 
+    	      State#state.match_fun,  
+    	      State#state.build_url_fun,
+    	      State#state.mconf, 
+    	      From, 
+	      Ref],
+    gen_server:cast(Pid, {work, Params}),
+    {noreply, State};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

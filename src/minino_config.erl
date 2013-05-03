@@ -75,7 +75,7 @@ init([MConf]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(get_conf, _From, State) ->
-    Reply = State#state.conf,
+    Reply = {ok, State#state.conf},
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------

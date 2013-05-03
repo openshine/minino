@@ -22,7 +22,8 @@
 	 get_session_cookie_domain/0,
 	 get_session_cookie_httponly/0,
 	 get_session_cookie_path/0,
-	 get_session_cookie_secure/0
+	 get_session_cookie_secure/0,
+	 get_file/2
 	]).
 
 
@@ -105,3 +106,15 @@ get_session_cookie_path() ->
 get_session_cookie_secure() ->
     minino_sessions:get_session_cookie_secure().
 
+
+
+get_file(MReq, Path) ->
+    Pid = MReq#mreq.from,
+    Ref =   make_ref(),
+    Pid ! {get_file, MReq, Path, Ref, self()},
+    receive
+	{get_file, Ref, Reply}	 ->
+	    Reply
+    after 100000 ->
+	    {error, timeout}
+    end.

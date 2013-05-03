@@ -15,19 +15,20 @@
 	 path/1
 	]). 
 
+response({error, Code}, MReq) ->
+    ErrorMsg = create_msg_error(Code),
+    {ErrorMsg, Code, MReq};
 
-response({error, 404}, MReq) ->
-    {ok, NewCReq} = cowboy_req:reply(404, [], <<"Error 404: Not found">>, MReq#mreq.creq),
-    MReq#mreq{creq=NewCReq};
-
-response(Msg, MReq) when is_list(Msg) ->
-    {ok, NewCReq} = cowboy_req:reply(200, 
-				     [], 
-				     list_to_binary(Msg), 
-				     MReq#mreq.creq),
-    MReq#mreq{creq=NewCReq}.
-
+response(Msg, MReq) ->
+     {list_to_binary(Msg), 200, MReq}.
 
 path(MReq) ->
     {BinPath, _} = cowboy_req:path(MReq#mreq.creq),
     string:tokens(binary_to_list(BinPath), "/").
+
+create_msg_error(404) ->
+    <<"Error 404: Not found">>;
+
+create_msg_error(Code) when is_integer(Code) ->
+    Msg = lists:flaten(io_lib:format("error ~p", [Code])),
+    list_to_binary(Msg).

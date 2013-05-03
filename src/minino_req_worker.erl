@@ -8,7 +8,8 @@
 %%%-------------------------------------------------------------------
 -module(minino_req_worker).
 
--behaviour(gen_server).
+ -behaviour(gen_server).
+
 
 -include("include/minino.hrl").
 
@@ -56,17 +57,17 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, MConf, To]}, State) ->
-    MReq2 = MReq#mreq{build_url_fun=BuildUrlFun, mconf=MConf},
+handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, MConf, From, Ref]}, State) ->
+    MReq2 = MReq#mreq{build_url_fun=BuildUrlFun, mconf=MConf, from=From},
     Path = minino_api:path(MReq2),
     Response =
      	case MatchFun(Path) of
     	    undefined ->
     		minino_api:response({error, 404}, MReq2);
     	    {View, Args} ->
-		MApp:View(MReq, Args)
+    		MApp:View(MReq2, Args)
     	end,
-    minino_dispatcher:response(To, Response),
+    minino_dispatcher:response(From, Response, Ref),
     {noreply, State}.
 
 handle_info(_Info, State) ->
@@ -77,6 +78,7 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================

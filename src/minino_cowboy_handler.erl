@@ -21,51 +21,63 @@ init(_Transport, CReq, []) ->
 
 handle(CReq, State) ->
     {ok, MReq} = minino_sessions:get_or_create(#mreq{creq=CReq}),
-    MReq2 = minino_dispatcher:dispatch(MReq),
-    CReqRespose = MReq2#mreq.creq,
-    {ok, CReqRespose, State}.
+    Ref = minino_dispatcher:dispatch(MReq),
+    {Msg, Code, MReq2} = receive_loop(Ref),
+    {ok, NewCReq} = cowboy_req:reply(Code, 
+				     [{<<"connection">>, <<"close">>}], 
+				     Msg, 
+				     MReq2#mreq.creq),
+    {ok, NewCReq, State}.
+
 
 terminate(_Reason, _Req, _State) ->
     ok.
 
-write_multipart_to_file(MReq)->
-    write_multipart_to_file_loop(MReq, [], []).
 
-%% write_file
-write_multipart_to_file_loop(MReq, Fd, Path) ->
-    R = try 
-	    cowboy_req:multipart_data(MReq#mreq.creq)
-	catch _:_ -> no_multipart
-	end,
-    case R of
-	{headers, _Headers, NewCReq} ->
-	    TmpFilePath = get_tmp_path(),
-	    filelib:ensure_dir(TmpFilePath),
-	    {ok, Fd1}  = file:open(TmpFilePath ,[write, raw]),
-	    write_multipart_to_file_loop(MReq#mreq{creq=NewCReq}, 
-					 Fd1, 
-					 TmpFilePath);
-	{body, Data, NewCReq} ->
-	    ok = file:write(Fd, Data),
-	    write_multipart_to_file_loop(MReq#mreq{creq=NewCReq}, 
-					 Fd, 
-					 Path);
-	{end_of_part, NewCReq}->
-	    ok = file:close(Fd),
-	    #mreq{creq=NewCReq,file=Path};
-	no_multipart ->
-	    MReq
+receive_loop(Ref) ->
+    receive
+	{response, Ref, Response} ->
+	    Response;
+	{get_file, MReq, Path, GetFileRef, From} ->
+	    Reply = save_file(MReq, Path),
+	    From ! {get_file, GetFileRef, Reply},
+	    receive_loop(Ref)
+    end.
+
+save_file(MReq, Path) ->
+    case is_secure_path(Path) of
+	true ->
+	    Multipart = try 
+			    cowboy_req:multipart_data(MReq#mreq.creq)
+			catch _:_ ->  no_multipart
+			end,
+	    case Multipart  of
+		no_multipart -> {error, no_multipart};
+		{headers, _Headers, NewCReq} ->
+		    {ok, Fd}  = file:open(Path, [write, raw]),	
+		    save_file_loop(NewCReq, Fd, Path);
+		Else -> {error, Else}
+	    end;
+	false -> {error, "path not valid"}
     end.
 
 
-get_tmp_path() ->
-    Filename = random_md5(),
-    {ok, MConf} = minino_config:get(),
-    Dir = proplists:get_value(uploadfiles, MConf, "priv/tmp"),
-    filename:join([Dir, Filename]).
+save_file_loop(CReq, Fd, Path) ->
+    case cowboy_req:multipart_data(CReq) of
+	{body, Data, NewCReq} ->
+	    ok = file:write(Fd, Data),
+	    save_file_loop(NewCReq, Fd,  Path);
+	{end_of_part, _NewCReq} ->
+	    ok = file:close(Fd),
+	    ok;
+	Else -> {error, Else}
+    end.
 
 
-random_md5() ->
-    Str = lists:flatten(io_lib:format("~p", [now()])),
-    Md5 = erlang:md5(Str),
-    lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= Md5]).
+is_secure_path(Path) ->
+    NoSecure = 
+	lists:any(fun("..")-> true;
+		     (_E)->false
+		  end,
+		  filename:split(Path)),
+    not NoSecure.
