@@ -23,7 +23,8 @@
 	 get_session_cookie_httponly/0,
 	 get_session_cookie_path/0,
 	 get_session_cookie_secure/0,
-	 get_file/2
+	 get_file/2,
+	 get_method/1
 	]).
 
 
@@ -111,3 +112,8 @@ get_session_cookie_secure() ->
 -spec get_file(MReq::minino_req(), Path::string()) -> ok | {error, Error::term()}.
 get_file(MReq, Path) ->
     minino_cowboy_handler:get_file(MReq, Path).
+
+%% @doc get method
+-spec get_method(MReq::minino_req()) -> string().
+get_method(MReq) ->
+    minino_req:get_method(MReq).

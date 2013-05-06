@@ -12,7 +12,8 @@
 -include("include/minino.hrl").
 
 -export([response/2,
-	 path/1
+	 path/1,
+	 get_method/1
 	]). 
 
 response({error, Code}, MReq) ->
@@ -32,3 +33,11 @@ create_msg_error(404) ->
 create_msg_error(Code) when is_integer(Code) ->
     Msg = lists:flaten(io_lib:format("error ~p", [Code])),
     list_to_binary(Msg).
+
+
+%% @doc get method
+-spec get_method(MReq::minino_req()) -> string().
+get_method(MReq) ->
+    {MethodBin,_Req} = cowboy_req:method(MReq#mreq.creq),
+    binary_to_list(MethodBin).
+    
