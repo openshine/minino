@@ -107,14 +107,7 @@ get_session_cookie_secure() ->
     minino_sessions:get_session_cookie_secure().
 
 
-
+%% @doc get file
+-spec get_file(MReq::minino_req(), Path::string()) -> ok | {error, Error::term()}.
 get_file(MReq, Path) ->
-    Pid = MReq#mreq.from,
-    Ref =   make_ref(),
-    Pid ! {get_file, MReq, Path, Ref, self()},
-    receive
-	{get_file, Ref, Reply}	 ->
-	    Reply
-    after 100000 ->
-	    {error, timeout}
-    end.
+    minino_cowboy_handler:get_file(MReq, Path).

@@ -14,6 +14,7 @@
 -export([handle/2]).
 -export([terminate/3]).
 
+-export([get_file/2]).
 
 init(_Transport, CReq, []) ->
     {ok, CReq, undefined}.
@@ -43,6 +44,21 @@ receive_loop(Ref) ->
 	    From ! {get_file, GetFileRef, Reply},
 	    receive_loop(Ref)
     end.
+
+
+
+get_file(MReq, Path) ->
+    Pid = MReq#mreq.from,
+    Ref =   make_ref(),
+    Pid ! {get_file, MReq, Path, Ref, self()},
+    receive
+	{get_file, Ref, Reply}	 ->
+	    Reply
+    after 100000 ->
+	    {error, timeout}
+    end.
+
+
 
 save_file(MReq, Path) ->
     case is_secure_path(Path) of
