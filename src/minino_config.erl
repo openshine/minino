@@ -141,22 +141,15 @@ read_file()->
 	end,
     {ok, Conf} = file:consult(Filename),
 
-    Conf2 = 
-    	case application:get_env(minino, mport) of
-    	    {ok, P} -> 
-		C = proplists:delete(port, Conf),
-		[{port, P}|C];
-	    _ -> Conf
-    	end,
+    Conf1 =
+    	lists:foldl(
+    	  fun({included_applications,_}, Acc) ->
+    		  Acc;
+    	     (Env, Acc) ->
+    		  [Env|Acc]
+    	  end,
+    	  Conf,
+    	  application:get_all_env(minino)),
 
-    TemplatesDir = 
-    	case application:get_env(minino, templates_dir) of
-	    {ok, T} -> 
-		{templates_dir, T};
-	    _ ->
-		{templates_dir,
-		 filename:join(["priv", "templates"])}
-	end,
-    {ok, [TemplatesDir|Conf2]}.
-
+    {ok, Conf1}.
 
