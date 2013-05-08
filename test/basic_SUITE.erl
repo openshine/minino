@@ -188,8 +188,8 @@ check_path(Path, Fun, Expected)->
 check_build_urls() ->
     DRules = get_dispatch_rules(), 
     F = minino_dispatcher:create_build_url_fun(DRules),
-    io:format("~p path -> ~p", [root_page, F(root_page, [])]),
-    io:format("~p path -> ~p", [home_page, F(home_page, [])]),
-    io:format("~p path -> ~p", [test_page, F(test_page, [{testvalue, "data"}])]),
+    "/" = F(root_page, []),
+    "/home" = F(home_page, []),
+    "/test/data" = F(test_page, [{testvalue, "data"}]),
     ok.
     
