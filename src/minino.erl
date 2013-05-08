@@ -26,7 +26,10 @@ start()->
     ok = ensure_start(minino).  
 					   	   
 stop()->
-    application:stop(?MODULE).
+    application:stop(crypto),
+    application:stop(ranch),
+    application:stop(cowboy),
+    application:stop(minino).
 
 
 ensure_start(App) ->

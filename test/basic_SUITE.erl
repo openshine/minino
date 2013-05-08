@@ -3,14 +3,42 @@
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 -export([simple_tests/1, 
-	 escript_tests/1]).
+	 escript_tests/1,
+	 kitty_tests/1
+	]).
 
-all() -> [escript_tests, 
+all() -> [
+	  kitty_tests,
+	  escript_tests, 
 	  simple_tests
 	 ].
 
+
+
+init_per_testcase(kitty_tests, Config) ->
+    application:start(inets),
+
+    %%compile app
+    DataDir = proplists:get_value(data_dir, Config),
+    AppSource = filename:join([DataDir, "kitty.erl"]),
+    {ok, kitty} = compile:file(AppSource),
+
+    %% set settings.cfg file
+    Settings = filename:join([DataDir, "settings.cfg"]),
+    application:set_env(minino, settings_file, Settings),      
+
+    %% set settings.cfg file
+    Templates = filename:join([DataDir, "templates"]),
+    application:set_env(minino, templates_dir, Templates),      
+
+    %%start minino
+    minino:start(),
+    Config;  
+
+
 init_per_testcase(simple_tests, Config) ->
     Config;   
+
 
 init_per_testcase(escript_tests, Config) ->
     application:start(inets),
@@ -41,12 +69,22 @@ init_per_testcase(escript_tests, Config) ->
     Config.
 
 end_per_testcase(_Test, _Config) ->
+    minino:stop(),
     ok.
 
 
 
 %%======================================================
-%% tests
+%% kitty_tests
+%%======================================================
+
+kitty_tests(_Config)->
+    kitty = kitty:check_module(),
+    Url = "http://127.0.0.1:8000",
+    ok = ping(Url), 
+    ok.
+%%======================================================
+%% escript_tests
 %%======================================================
 
 escript_tests(_Config) ->
@@ -58,7 +96,7 @@ escript_tests(_Config) ->
     ok.
 
 ping(Url) ->  
-    {ok, R} = httpc:request(Url),
+    {ok, R} =    httpc:request(get, {Url, []}, [{timeout, 3000}], []),
     {{_,200,_},_Headers,_Body} = R,
     ok.
 
