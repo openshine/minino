@@ -3,16 +3,16 @@
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 -export([simple_tests/1, 
-	 tests/1]).
+	 escript_tests/1]).
 
-all() -> [tests, 
+all() -> [escript_tests, 
 	  simple_tests
 	 ].
 
 init_per_testcase(simple_tests, Config) ->
     Config;   
 
-init_per_testcase(tests, Config) ->
+init_per_testcase(escript_tests, Config) ->
     application:start(inets),
 
     MininoPriv = code:priv_dir(minino),
@@ -49,7 +49,7 @@ end_per_testcase(_Test, _Config) ->
 %% tests
 %%======================================================
 
-tests(_Config) ->
+escript_tests(_Config) ->
     Url = "http://127.0.0.1:8000",
     ok = ping(Url),
     io:format("test ping: ~p -> ok", [Url]),
