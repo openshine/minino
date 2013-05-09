@@ -81,7 +81,13 @@ end_per_testcase(_Test, _Config) ->
 kitty_tests(_Config)->
     kitty = kitty:check_module(),
     Url = "http://127.0.0.1:8000",
-    ok = ping(Url), 
+    io:format("check http codes~n"),
+    200 = get_http_code(Url),
+    io:format("code 200 -> ok~n"),
+    404 = get_http_code(Url ++ "/undefined"),
+    io:format("code 404 -> ok~n"),
+    500 = get_http_code(Url ++ "/error500"),
+    io:format("code 500 -> ok~n"),
     ok.
 %%======================================================
 %% escript_tests
@@ -89,16 +95,21 @@ kitty_tests(_Config)->
 
 escript_tests(_Config) ->
     Url = "http://127.0.0.1:8000",
-    ok = ping(Url),
+    200 = get_http_code(Url),
     io:format("test ping: ~p -> ok", [Url]),
     Cookie = check_cookies(Url),
     io:format("check cookies: ~p~n", [Cookie]),
     ok.
 
-ping(Url) ->  
+%% ping(Url) ->  
+%%     {ok, R} =    httpc:request(get, {Url, []}, [{timeout, 3000}], []),
+%%     {{_,200,_},_Headers,_Body} = R,
+%%     ok.
+
+get_http_code(Url) ->
     {ok, R} =    httpc:request(get, {Url, []}, [{timeout, 3000}], []),
-    {{_,200,_},_Headers,_Body} = R,
-    ok.
+    {{_,Code,_},_Headers,_Body} = R,
+    Code.
 
 check_cookies(Url) ->
     {ok, R} = httpc:request(Url),
