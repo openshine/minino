@@ -7,3 +7,6 @@ deps
 *.beam
 *.plt
 bin/minino
+examples/*/deps
+examples/*/ebin
+examples/*/minino

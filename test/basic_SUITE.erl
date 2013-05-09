@@ -2,12 +2,15 @@
 -include_lib("common_test/include/ct.hrl").
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
+
 -export([simple_tests/1, 
 	 escript_tests/1,
-	 kitty_tests/1
+	 kitty_tests/1,
+	 hello_world_example_tests/1
 	]).
 
 all() -> [
+	  hello_world_example_tests,
 	  kitty_tests,
 	  escript_tests, 
 	  simple_tests
@@ -15,8 +18,30 @@ all() -> [
 
 
 
-init_per_testcase(kitty_tests, Config) ->
+
+init_per_testcase(hello_world_example_tests, Config) ->
+
+    %% compile app
+    MininoPriv = code:priv_dir(minino),
+    ExampleDir = filename:join([MininoPriv, "..", "examples", "hello_world"]),
+
+    AppSource = filename:join([ExampleDir, "src", "hello_world.erl"]),
+    {ok, hello_world} = compile:file(AppSource),
+
+    %% set settings.cfg file
+    Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
+    application:set_env(minino, settings_file, Settings),      
+
+    %% start inets
     application:start(inets),
+
+    %%start minino
+    minino:start(),
+    Config;  
+
+
+
+init_per_testcase(kitty_tests, Config) ->
 
     %%compile app
     DataDir = proplists:get_value(data_dir, Config),
@@ -27,9 +52,12 @@ init_per_testcase(kitty_tests, Config) ->
     Settings = filename:join([DataDir, "settings.cfg"]),
     application:set_env(minino, settings_file, Settings),      
 
-    %% set settings.cfg file
+    %% set templates dir
     Templates = filename:join([DataDir, "templates"]),
     application:set_env(minino, templates_dir, Templates),      
+
+    %% start inets
+    application:start(inets),
 
     %%start minino
     minino:start(),
@@ -70,7 +98,21 @@ init_per_testcase(escript_tests, Config) ->
 
 end_per_testcase(_Test, _Config) ->
     minino:stop(),
+    error_logger:info_msg("end test~n"),
     ok.
+
+
+
+%%======================================================
+%% hello_world_example_tests
+%%======================================================
+
+
+hello_world_example_tests(_Config)->
+    Url = "http://127.0.0.1:8000",
+    200 = get_http_code(Url),
+    error_logger:info_msg("code 200 -> ok~n"),
+     ok.
 
 
 
@@ -81,13 +123,13 @@ end_per_testcase(_Test, _Config) ->
 kitty_tests(_Config)->
     kitty = kitty:check_module(),
     Url = "http://127.0.0.1:8000",
-    io:format("check http codes~n"),
+    error_logger:info_msg("check http codes~n"),
     200 = get_http_code(Url),
-    io:format("code 200 -> ok~n"),
+    error_logger:info_msg("code 200 -> ok~n"),
     404 = get_http_code(Url ++ "/undefined"),
-    io:format("code 404 -> ok~n"),
+    error_logger:info_msg("code 404 -> ok~n"),
     500 = get_http_code(Url ++ "/error500"),
-    io:format("code 500 -> ok~n"),
+    error_logger:info_msg("code 500 -> ok~n"),
     ok.
 %%======================================================
 %% escript_tests
@@ -96,15 +138,10 @@ kitty_tests(_Config)->
 escript_tests(_Config) ->
     Url = "http://127.0.0.1:8000",
     200 = get_http_code(Url),
-    io:format("test ping: ~p -> ok", [Url]),
+    error_logger:info_msg("test ping: ~p -> ok", [Url]),
     Cookie = check_cookies(Url),
-    io:format("check cookies: ~p~n", [Cookie]),
+    error_logger:info_msg("check cookies: ~p~n", [Cookie]),
     ok.
-
-%% ping(Url) ->  
-%%     {ok, R} =    httpc:request(get, {Url, []}, [{timeout, 3000}], []),
-%%     {{_,200,_},_Headers,_Body} = R,
-%%     ok.
 
 get_http_code(Url) ->
     {ok, R} =    httpc:request(get, {Url, []}, [{timeout, 3000}], []),
@@ -115,7 +152,7 @@ check_cookies(Url) ->
     {ok, R} = httpc:request(Url),
     {{_,200,_},Headers,_Body} = R,
     {ok, Cookie} = get_cookie(Headers),
-    io:format("cookie: ~p~n", [Cookie]),
+    error_logger:info_msg("cookie: ~p~n", [Cookie]),
     Request = {Url, [{"Cookie", "msession=" ++ Cookie}]},
     {ok, R1} = httpc:request(get, Request, [], []),
     {{_,200,_},Headers1,_Body1} = R1,
@@ -126,7 +163,7 @@ get_cookie(Headers) ->
     case proplists:get_value("set-cookie", Headers) of
 	undefined -> error;
 	Val ->
-	  get_cookie_loop(string:tokens(Val, "; "))
+	    get_cookie_loop(string:tokens(Val, "; "))
     end.
 
 get_cookie_loop([])->
@@ -137,7 +174,7 @@ get_cookie_loop([H|T])->
 	["msession", Cookie] ->
 	    {ok, Cookie};
 	_Else ->
-	   get_cookie_loop(T) 
+	    get_cookie_loop(T) 
     end.
 
 %%======================================================
@@ -158,10 +195,10 @@ get_dispatch_rules() ->
     ].
 
 check_dispatch_rules() ->
-    io:format("~n** dispatch rules test **"),
+    error_logger:info_msg("~n** dispatch rules test **"),
     DRules = get_dispatch_rules(), 
 
-    io:format("Dispatch rules: ~p", [DRules]),
+    error_logger:info_msg("Dispatch rules: ~p", [DRules]),
     F = minino_dispatcher:create_match_fun(DRules),
 
     %% test path
@@ -192,7 +229,7 @@ check_path(Path, Fun, Expected)->
 	      RArgs);
 	undefined -> R = undefined
     end,
-    io:format("check path ~p Expected: ~p -> ok", [Path, Expected]).
+    error_logger:info_msg("check path ~p Expected: ~p -> ok", [Path, Expected]).
 
 
 
@@ -203,4 +240,4 @@ check_build_urls() ->
     "/home" = F(home_page, []),
     "/test/data" = F(test_page, [{testvalue, "data"}]),
     ok.
-    
+
