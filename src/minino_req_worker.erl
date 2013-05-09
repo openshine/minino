@@ -65,8 +65,19 @@ handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, MConf, From, Ref]}, State
     	    undefined ->
     		minino_api:response({error, 404}, MReq2);
     	    {View, Args} ->
-    		MApp:View(MReq2, Args)
-    	end,
+		try
+		    MApp:View(MReq2, Args)
+		catch Class:Exception ->
+			ErrorMsg =
+			    "error in ~p:~p ~n" ++
+			    "~p:~p~n" ++
+			    "view: ~p~n" ++ 
+			    "args: ~p~n" ++
+			    "minino request: ~p~n",
+			error_logger:error_msg(ErrorMsg, [MApp, View, Class, Exception, View, Args, MReq2]),
+			minino_api:response({error, 500}, MReq2)
+		end
+	end,
     minino_dispatcher:response(From, Response, Ref),
     {noreply, State}.
 

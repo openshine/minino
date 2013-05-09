@@ -28,8 +28,9 @@ path(MReq) ->
     string:tokens(binary_to_list(BinPath), "/").
 
 create_msg_error(404) ->
-    <<"Error 404: Not found">>;
-
+    <<"Error 404: Not found.">>;
+create_msg_error(500) ->
+    <<"Error 500: Internal server error.">>;
 create_msg_error(Code) when is_integer(Code) ->
     Msg = lists:flaten(io_lib:format("error ~p", [Code])),
     list_to_binary(Msg).
