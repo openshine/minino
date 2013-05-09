@@ -189,13 +189,19 @@ compile_templates_loop([{RelativePath, Path}|Tail], Acc) ->
 
 
 get_templates(TemplatesDir) ->
-    Templates = get_templates_recursive(TemplatesDir),
-    SplitedTemDir = filename:split(TemplatesDir),
-    lists:map(fun(T) -> 
-		      RPath = get_relative_path(SplitedTemDir, filename:split(T)),
-		      {RPath, T}
-	      end,
-	      Templates).		      
+    case filelib:is_dir(TemplatesDir) of
+	false -> [];
+	true ->
+	    
+	    Templates = get_templates_recursive(TemplatesDir),
+	    SplitedTemDir = filename:split(TemplatesDir),
+	    lists:map(fun(T) -> 
+			      RPath = get_relative_path(SplitedTemDir, filename:split(T)),
+			      {RPath, T}
+		      end,
+		      Templates)
+    end. 
+
 
 get_templates_recursive(Filename) ->
     case filelib:is_dir(Filename) of
