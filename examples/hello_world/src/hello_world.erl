@@ -8,12 +8,16 @@
 
 
 %% views
--export([home_view/2]).
+-export([home_view/3]).
+
+-record(state, {}).
 
 %% minino funs
 
 init(_MConf) ->
-    ok.
+    {ok, #state{}}.
+
+
 
 dispatch_rules() ->
     [%% {Id::atom(), Path::[string()|atom()], view::atom()}
@@ -21,5 +25,5 @@ dispatch_rules() ->
     ].
 
 %% views
-home_view(MReq, _Args) ->
+home_view(MReq, _Args, _State) ->
     minino_api:response("Hello world!!", MReq).

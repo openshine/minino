@@ -8,15 +8,16 @@
 
 
 %% views
--export([home_view/2,
-	 internal_error_view/2,
+-export([home_view/3,
+	 internal_error_view/3,
 	 check_module/0]).
 
+-record(state, {}).
 
 %% minino funs
 
 init(_MConf) ->
-    ok.
+    {ok, #state{}}.
 
 dispatch_rules() ->
     [%% {Id::atom(), Path::[string()|atom()], view::atom()}
@@ -27,7 +28,7 @@ dispatch_rules() ->
 
 %% views
 
-home_view(MReq, _Args) ->
+home_view(MReq, _Args, _State) ->
     {ok, Html} = minino_api:render_template("home.html", [{text, "Meow!!"}]),
     io:format("dbg: method: ~p~n", [minino_api:get_method(MReq)]),
     minino_api:response(Html, MReq).
@@ -35,5 +36,5 @@ home_view(MReq, _Args) ->
 check_module()->
     ?MODULE.
 
-internal_error_view(_MReq, _Args) ->
+internal_error_view(_MReq, _Args, _State) ->
     erlang:error(deliberate_error).

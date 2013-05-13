@@ -27,7 +27,8 @@
 -record(state, {mapp,
 		mconf,
 		match_fun,
-		build_url_fun
+		build_url_fun,
+		app_state
 	       }).
 
 
@@ -101,9 +102,11 @@ init([MConf]) ->
 %%--------------------------------------------------------------------
 handle_call(update_rules, _From, State) ->
     MApp =State#state.mapp,
-    R = MApp:dispatch_rules(),
-    MatchFun = create_match_fun(R),
-    {reply, ok, State#state{match_fun=MatchFun}};
+    Rules = MApp:dispatch_rules(),
+    MatchFun = create_match_fun(Rules),
+    {ok, AppState} =  MApp:init(State#state.mconf),
+    {reply, ok, State#state{match_fun=MatchFun,
+			   app_state=AppState}};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -134,6 +137,7 @@ handle_cast({dispatch, MReq, From, Ref}, State) ->
     	      State#state.match_fun,  
     	      State#state.build_url_fun,
     	      State#state.mconf, 
+	      State#state.app_state,
     	      From, 
 	      Ref],
     gen_server:cast(Pid, {work, Params}),
