@@ -8,5 +8,7 @@ deps
 *.plt
 bin/minino
 examples/*/deps
+examples/*/rebar
 examples/*/ebin
 examples/*/minino
+examples/*/priv/tmp

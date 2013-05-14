@@ -1,15 +1,19 @@
 -module(basic_SUITE).
 -include_lib("common_test/include/ct.hrl").
 
+-define(BLOCKSIZE, 32768).
+
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
 -export([simple_tests/1, 
 	 escript_tests/1,
 	 kitty_tests/1,
-	 hello_world_example_tests/1
+	 hello_world_example_tests/1,
+	 upload_file_example_tests/1
 	]).
 
 all() -> [
+	  upload_file_example_tests,
 	  hello_world_example_tests,
 	  kitty_tests,
 	  escript_tests, 
@@ -17,6 +21,34 @@ all() -> [
 	 ].
 
 
+init_per_testcase(upload_file_example_tests, Config) ->
+    %% compile app
+    MininoPriv = code:priv_dir(minino),
+    ExampleDir = filename:join([MininoPriv, "..", "examples", "upload_file"]),
+
+    AppSource = filename:join([ExampleDir, "src", "upload_file.erl"]),
+    {ok, upload_file} = compile:file(AppSource),
+
+    %% set settings.cfg file
+    Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
+    application:set_env(minino, settings_file, Settings),      
+
+    %% set templates dir
+    Templates = filename:join([ExampleDir, "priv", "templates"]),
+    application:set_env(minino, templates_dir, Templates),      
+
+
+    %% over write file_name 
+    TestPrivDir = proplists:get_value(priv_dir, Config),
+    FileName = filename:join([TestPrivDir, "tmp", "filename"]),
+    application:set_env(minino, file_name, FileName),      
+      
+    %% start inets
+    application:start(inets),
+
+    %%start minino
+    minino:start(),
+    Config;
 
 
 init_per_testcase(hello_world_example_tests, Config) ->
@@ -100,6 +132,36 @@ end_per_testcase(_Test, _Config) ->
     minino:stop(),
     error_logger:info_msg("end test~n"),
     ok.
+
+
+%%======================================================
+%% upload_file_example_tests 
+%%======================================================
+
+
+upload_file_example_tests(Config)->
+    Url = "http://127.0.0.1:8000/upload",
+    200 = get_http_code(Url),
+    error_logger:info_msg("code 200 -> ok~n"),
+    DataDir = proplists:get_value(data_dir, Config),
+    SourcePath = filename:join([DataDir,"test_files", "logo.png"]),
+    post_file(Url, SourcePath),
+    {ok, MConf} = minino_api:get_conf(),
+    DestinationPath = proplists:get_value(file_name, MConf), 
+    DestinationMd5 =  get_file_md5(DestinationPath),
+    SourceMd5  = get_file_md5(SourcePath),
+    if 
+	DestinationMd5 == SourceMd5 ->
+	    ok
+    end,
+    ok.
+
+post_file(Url, Path)->
+    {ok, Data} = file:read_file(Path),
+    httpc:request(post, {Url, [], "image/png", Data}, [], []),
+    ok.
+
+
 
 
 
@@ -241,3 +303,29 @@ check_build_urls() ->
     "/test/data" = F(test_page, [{testvalue, "data"}]),
     ok.
 
+
+get_file_md5(CompletePath)->
+    case file:open(CompletePath, [binary,raw,read]) of
+	{ok, P} -> 
+	    case get_code_loop(P, erlang:md5_init()) of
+		{ok, MD5} ->
+		    {ok, md5_to_str(MD5)};
+		Error ->
+		    Error
+	    end;
+	Error -> 
+	    Error
+    end.
+
+
+get_code_loop(File, C) ->
+    case file:read(File, ?BLOCKSIZE) of
+	{ok, Bin} ->
+	    get_code_loop(File, erlang:md5_update(C, Bin));
+	eof ->
+	    file:close(File),
+        {ok, erlang:md5_final(C)}
+    end.
+
+md5_to_str(MD5) ->
+    lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= MD5]).
