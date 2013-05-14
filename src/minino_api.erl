@@ -24,7 +24,8 @@
 	 get_session_cookie_path/0,
 	 get_session_cookie_secure/0,
 	 get_file/2,
-	 get_method/1
+	 get_method/1,
+	 get_conf/0
 	]).
 
 
@@ -117,3 +118,8 @@ get_file(MReq, Path) ->
 -spec get_method(MReq::minino_req()) -> string().
 get_method(MReq) ->
     minino_req:get_method(MReq).
+
+%% @doc get conf
+-spec get_conf() -> [tuple()].
+get_conf() ->
+    minino_config:get().

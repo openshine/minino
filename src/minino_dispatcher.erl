@@ -79,10 +79,12 @@ init([MConf]) ->
     MApp = proplists:get_value(app_mod, MConf),
     MatchFun = create_match_fun(MApp:dispatch_rules()),
     BuildUrlFun = create_build_url_fun(MApp:dispatch_rules()),
+    {ok, AppState} =  MApp:init(MConf),
     {ok, #state{mapp=MApp,
 		mconf=MConf,
 		build_url_fun=BuildUrlFun,
-		match_fun=MatchFun
+		match_fun=MatchFun,
+		app_state=AppState
 	       }}.
 
 

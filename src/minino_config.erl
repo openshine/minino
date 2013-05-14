@@ -150,6 +150,5 @@ read_file()->
     	  end,
     	  Conf,
     	  application:get_all_env(minino)),
-
     {ok, Conf1}.
 

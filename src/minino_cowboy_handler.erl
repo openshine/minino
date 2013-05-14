@@ -58,22 +58,26 @@ get_file(MReq, Path) ->
 	    {error, timeout}
     end.
 
-
-
 save_file(MReq, Path) ->
     case is_secure_path(Path) of
 	true ->
-	    Multipart = try 
-			    cowboy_req:multipart_data(MReq#mreq.creq)
-			catch _:_ ->  no_multipart
-			end,
-	    case Multipart  of
-		no_multipart -> {error, no_multipart};
-		{headers, _Headers, NewCReq} ->
-		    {ok, Fd}  = file:open(Path, [write, raw]),	
-		    save_file_loop(NewCReq, Fd, Path);
-		Else -> {error, Else}
-	    end;
+	   case cowboy_req:has_body(MReq#mreq.creq) of
+	       true ->
+		   Multipart = try 
+				   cowboy_req:multipart_data(MReq#mreq.creq)
+			       catch _:_ ->  no_multipart
+			       end,
+		   case Multipart  of
+		       no_multipart -> 
+			   {ok, Body, _CReq} = cowboy_req:body(MReq#mreq.creq),
+			   file:write_file(Path, Body);
+		       {headers, _Headers, NewCReq} ->
+			   {ok, Fd}  = file:open(Path, [write, raw]),	
+			   save_file_loop(NewCReq, Fd, Path);
+		       Else -> {error, Else}
+		   end;
+	       false -> {error, "no data"}
+	   end;
 	false -> {error, "path not valid"}
     end.
 
