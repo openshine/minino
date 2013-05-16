@@ -13,7 +13,8 @@
 
 -export([response/2,
 	 path/1,
-	 get_method/1
+	 get_method/1,
+	 get_params/1
 	]). 
 
 response({error, Code}, MReq) ->
@@ -42,3 +43,9 @@ get_method(MReq) ->
     {MethodBin,_Req} = cowboy_req:method(MReq#mreq.creq),
     binary_to_list(MethodBin).
     
+
+%% @doc get request args
+-spec get_params(MReq::minino_req()) -> [{Key::binary(), Value::binary()}].
+get_params(MReq) ->
+    {Args, _Creq} = cowboy_req:qs_vals(MReq#mreq.creq),
+    Args.

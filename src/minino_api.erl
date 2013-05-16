@@ -25,7 +25,8 @@
 	 get_session_cookie_secure/0,
 	 get_file/2,
 	 get_method/1,
-	 get_conf/0
+	 get_conf/0,
+	 url_params/1
 	]).
 
 
@@ -72,8 +73,6 @@ get_session_dict(MReq) ->
 				 {ok, MReq1::minino_req()} | {error, Error::term()}.
 update_session_dict(MReq, Dict) ->
     minino_sessions:update_dict(MReq, Dict).
-
-
 
 %% @doc get cookie.
 -spec get_cookie(MReq::minino_req(), CookieName::string()) -> string()|undefined.
@@ -123,3 +122,9 @@ get_method(MReq) ->
 -spec get_conf() -> [tuple()].
 get_conf() ->
     minino_config:get().
+
+
+%% @doc get request args
+-spec url_params(MReq::minino_req()) -> [{Key::binary(), Value::binary()}].
+url_params(MReq) ->
+    minino_req:get_params(MReq).
