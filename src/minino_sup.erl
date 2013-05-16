@@ -32,8 +32,21 @@ start_link(Params) ->
 %% ===================================================================
  
 init(Params) ->
+    [MConf] = Params,
     ConfServer = ?CHILD_WITH_PARAMS(minino_config, worker, Params),
     SessionsServer = ?CHILD_WITH_PARAMS(minino_sessions, worker, Params),
     DispSup = ?CHILD_WITH_PARAMS(minino_dispatcher_sup, supervisor, Params),
     TempSup = ?CHILD_WITH_PARAMS(minino_templates_sup, supervisor, Params),
-    {ok, {{one_for_one, 5, 10}, [ConfServer, SessionsServer, DispSup, TempSup]} }.
+    Specs = [ConfServer, SessionsServer, DispSup, TempSup],
+    AppMod = proplists:get_value(app_mod, MConf),
+    AppChildSpecs = 
+    	try
+    	   AppMod:add_children_to_main_sup(MConf)
+    	catch _:E ->
+		error_logger:info_msg("error: ~p~n", [E]),
+    		[]
+    	end,
+
+
+
+    {ok, {{one_for_one, 5, 10}, Specs ++ AppChildSpecs}}.

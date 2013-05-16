@@ -5,7 +5,7 @@ Use rebar to compile this example. You can use the escript stored in the project
 ``` bash
 $ ../../rebar get-deps compile
 ```
-You need minino escript, as well.
+You need the minino escript, as well.
 ``` bash
 $ cp ../../bin/minino .
 ```

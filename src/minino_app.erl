@@ -48,10 +48,7 @@ start(_StartType, _StartArgs) ->
     			  [{port, Port}], 
     			  [{env, [{dispatch, Dispatch}]}]
     			 ), 
-    %% io:format("~nstart minino web server: http://127.0.0.1:~p~n", [Port]),
     error_logger:info_msg("~nstart minino web server: http://127.0.0.1:~p~n", [Port]),
-
-
     Params = [MConf],
     minino_sup:start_link(Params).
 

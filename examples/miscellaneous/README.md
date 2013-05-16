@@ -1,5 +1,5 @@
-Minino Upload file
-==================
+Minino miscellaneous
+====================
 
 Use rebar to compile this example. You can use the escript stored in the project main dir.
 ``` bash
@@ -14,7 +14,7 @@ Start minino
 $ ./minino runserver
 ```
 
-You can start an erlang node and start the minino "upload_file" app without the minino escript typing the following command:
+You can start an erlang node and start the minino "miscellaneous" app without the minino escript typing the following command:
 
 ``` bash
 erl -pa ebin/ -pa deps/*/ebin -s minino

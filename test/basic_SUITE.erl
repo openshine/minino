@@ -9,10 +9,12 @@
 	 escript_tests/1,
 	 kitty_tests/1,
 	 hello_world_example_tests/1,
-	 upload_file_example_tests/1
+	 upload_file_example_tests/1,
+	 miscellaneous_example_tests/1
 	]).
 
 all() -> [
+	  miscellaneous_example_tests,
 	  upload_file_example_tests,
 	  hello_world_example_tests,
 	  kitty_tests,
@@ -21,13 +23,29 @@ all() -> [
 	 ].
 
 
+init_per_testcase(miscellaneous_example_tests, Config) ->
+    %% compile app
+    {ok, ExampleDir} = compile_example_mods(miscellaneous),   
+   
+    %% set settings.cfg file
+    Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
+    application:set_env(minino, settings_file, Settings),      
+
+    %% set templates dir
+    Templates = filename:join([ExampleDir, "priv", "templates"]),
+    application:set_env(minino, templates_dir, Templates),      
+      
+    %% start inets
+    application:start(inets),
+
+    %%start minino
+    minino:start(),
+    Config;
+
+
 init_per_testcase(upload_file_example_tests, Config) ->
     %% compile app
-    MininoPriv = code:priv_dir(minino),
-    ExampleDir = filename:join([MininoPriv, "..", "examples", "upload_file"]),
-
-    AppSource = filename:join([ExampleDir, "src", "upload_file.erl"]),
-    {ok, upload_file} = compile:file(AppSource),
+    {ok, ExampleDir} = compile_example_mods(upload_file),   
 
     %% set settings.cfg file
     Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
@@ -52,13 +70,8 @@ init_per_testcase(upload_file_example_tests, Config) ->
 
 
 init_per_testcase(hello_world_example_tests, Config) ->
-
     %% compile app
-    MininoPriv = code:priv_dir(minino),
-    ExampleDir = filename:join([MininoPriv, "..", "examples", "hello_world"]),
-
-    AppSource = filename:join([ExampleDir, "src", "hello_world.erl"]),
-    {ok, hello_world} = compile:file(AppSource),
+    {ok, ExampleDir} = compile_example_mods(hello_world),
 
     %% set settings.cfg file
     Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
@@ -74,7 +87,6 @@ init_per_testcase(hello_world_example_tests, Config) ->
 
 
 init_per_testcase(kitty_tests, Config) ->
-
     %%compile app
     DataDir = proplists:get_value(data_dir, Config),
     AppSource = filename:join([DataDir, "kitty.erl"]),
@@ -134,6 +146,19 @@ end_per_testcase(_Test, _Config) ->
     ok.
 
 
+
+%%======================================================
+%%  miscellaneous_example_tests
+%%======================================================
+
+
+miscellaneous_example_tests(_Config)->
+    Url = "http://127.0.0.1:8000/",
+    200 = get_http_code(Url),
+    error_logger:info_msg("code 200 -> ok~n"),
+    ok = miscellaneous_server:test(),
+    ok.
+
 %%======================================================
 %% upload_file_example_tests 
 %%======================================================
@@ -160,9 +185,6 @@ post_file(Url, Path)->
     {ok, Data} = file:read_file(Path),
     httpc:request(post, {Url, [], "image/png", Data}, [], []),
     ok.
-
-
-
 
 
 %%======================================================
@@ -329,3 +351,18 @@ get_code_loop(File, C) ->
 
 md5_to_str(MD5) ->
     lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= MD5]).
+
+compile_example_mods(Example) ->
+    MininoPriv = code:priv_dir(minino),
+    Name = erlang:atom_to_list(Example),
+    ExampleDir = filename:join([MininoPriv, "..", "examples", Name]),
+    Files = filelib:wildcard(filename:join([ExampleDir, "src", "*.erl"])),
+    compile_mods_loop(Files, ExampleDir).
+    
+compile_mods_loop([], ExampleDir)->
+     {ok, ExampleDir};
+
+compile_mods_loop([File|Tail], ExampleDir)->
+    {ok, _Mod} = compile:file(File),
+    compile_mods_loop(Tail, ExampleDir).
+
