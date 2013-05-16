@@ -10,10 +10,12 @@
 	 kitty_tests/1,
 	 hello_world_example_tests/1,
 	 upload_file_example_tests/1,
-	 miscellaneous_example_tests/1
+	 miscellaneous_example_tests/1,
+	 sessions_example_tests/1
 	]).
 
 all() -> [
+	  sessions_example_tests,
 	  miscellaneous_example_tests,
 	  upload_file_example_tests,
 	  hello_world_example_tests,
@@ -21,6 +23,26 @@ all() -> [
 	  escript_tests, 
 	  simple_tests
 	 ].
+
+init_per_testcase(sessions_example_tests, Config) ->
+    %% compile app
+    {ok, ExampleDir} = compile_example_mods(sessions),   
+   
+    %% set settings.cfg file
+    Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
+    application:set_env(minino, settings_file, Settings),      
+
+    %% set templates dir
+    Templates = filename:join([ExampleDir, "priv", "templates"]),
+    application:set_env(minino, templates_dir, Templates),      
+      
+    %% start inets
+    application:start(inets),
+
+    %%start minino
+    minino:start(),
+    Config;
+
 
 
 init_per_testcase(miscellaneous_example_tests, Config) ->
@@ -54,7 +76,6 @@ init_per_testcase(upload_file_example_tests, Config) ->
     %% set templates dir
     Templates = filename:join([ExampleDir, "priv", "templates"]),
     application:set_env(minino, templates_dir, Templates),      
-
 
     %% over write file_name 
     TestPrivDir = proplists:get_value(priv_dir, Config),
@@ -146,15 +167,31 @@ end_per_testcase(_Test, _Config) ->
     ok.
 
 
+%%======================================================
+%% sessions_example_tests
+%%======================================================
+
+sessions_example_tests(_Config)->
+    Url = "http://127.0.0.1:8000/",
+    {200, _Body1, SessionKey} = request(Url),
+    Dict1 = minino_api:get_session_dict(SessionKey),
+    error = dict:find("key", Dict1),
+    {200, _Body2, SessionKey} = request(Url ++ "?value=minino", SessionKey),
+    Dict2 = minino_api:get_session_dict(SessionKey),
+    {ok, "minino"} = dict:find("key", Dict2),
+    {200, _Body3, SessionKey} = request(Url ++ "?value=minino1", SessionKey),
+    Dict3 = minino_api:get_session_dict(SessionKey),
+    {ok, "minino1"} = dict:find("key", Dict3),
+    ok.
+
 
 %%======================================================
 %%  miscellaneous_example_tests
 %%======================================================
 
-
 miscellaneous_example_tests(_Config)->
     Url = "http://127.0.0.1:8000/",
-    200 = get_http_code(Url),
+    {200, _Body, _} = request(Url),
     error_logger:info_msg("code 200 -> ok~n"),
     ok = miscellaneous_server:test(),
     ok.
@@ -166,7 +203,7 @@ miscellaneous_example_tests(_Config)->
 
 upload_file_example_tests(Config)->
     Url = "http://127.0.0.1:8000/upload",
-    200 = get_http_code(Url),
+    {200, _Body, _} = request(Url),
     error_logger:info_msg("code 200 -> ok~n"),
     DataDir = proplists:get_value(data_dir, Config),
     SourcePath = filename:join([DataDir,"test_files", "logo.png"]),
@@ -194,9 +231,9 @@ post_file(Url, Path)->
 
 hello_world_example_tests(_Config)->
     Url = "http://127.0.0.1:8000",
-    200 = get_http_code(Url),
+    {200, _Body, _} = request(Url),
     error_logger:info_msg("code 200 -> ok~n"),
-     ok.
+    ok.
 
 
 
@@ -208,11 +245,11 @@ kitty_tests(_Config)->
     kitty = kitty:check_module(),
     Url = "http://127.0.0.1:8000",
     error_logger:info_msg("check http codes~n"),
-    200 = get_http_code(Url),
+    {200, _Body, _} = request(Url),
     error_logger:info_msg("code 200 -> ok~n"),
-    404 = get_http_code(Url ++ "/undefined"),
+    {404, _Body1, _} = request(Url ++ "/undefined"),
     error_logger:info_msg("code 404 -> ok~n"),
-    500 = get_http_code(Url ++ "/error500"),
+    {500, _Body2, _} = request(Url ++ "/error500"),
     error_logger:info_msg("code 500 -> ok~n"),
     ok.
 %%======================================================
@@ -221,45 +258,23 @@ kitty_tests(_Config)->
 
 escript_tests(_Config) ->
     Url = "http://127.0.0.1:8000",
-    200 = get_http_code(Url),
+    {200, _Body, _} = request(Url),
     error_logger:info_msg("test ping: ~p -> ok", [Url]),
     Cookie = check_cookies(Url),
     error_logger:info_msg("check cookies: ~p~n", [Cookie]),
     ok.
 
-get_http_code(Url) ->
-    {ok, R} =    httpc:request(get, {Url, []}, [{timeout, 3000}], []),
-    {{_,Code,_},_Headers,_Body} = R,
-    Code.
-
 check_cookies(Url) ->
     {ok, R} = httpc:request(Url),
     {{_,200,_},Headers,_Body} = R,
-    {ok, Cookie} = get_cookie(Headers),
+    {ok, Cookie} = get_session(Headers),
     error_logger:info_msg("cookie: ~p~n", [Cookie]),
     Request = {Url, [{"Cookie", "msession=" ++ Cookie}]},
     {ok, R1} = httpc:request(get, Request, [], []),
     {{_,200,_},Headers1,_Body1} = R1,
-    error = get_cookie(Headers1),
+    error = get_session(Headers1),
     Cookie.
 
-get_cookie(Headers) ->
-    case proplists:get_value("set-cookie", Headers) of
-	undefined -> error;
-	Val ->
-	    get_cookie_loop(string:tokens(Val, "; "))
-    end.
-
-get_cookie_loop([])->
-    error;
-
-get_cookie_loop([H|T])->
-    case string:tokens(H, "=") of
-	["msession", Cookie] ->
-	    {ok, Cookie};
-	_Else ->
-	    get_cookie_loop(T) 
-    end.
 
 %%======================================================
 %% Simple Tests
@@ -366,3 +381,45 @@ compile_mods_loop([File|Tail], ExampleDir)->
     {ok, _Mod} = compile:file(File),
     compile_mods_loop(Tail, ExampleDir).
 
+request(Url) ->
+    request(get, Url, undefined).
+
+request(Url, Session) ->
+    request(get, Url, Session).
+
+request(Method, Url, Session) ->
+    Headers = 
+	case Session of
+	    Undefined when Undefined == undefined ->
+		[];
+	    Session ->
+		
+		[{"Cookie", "msession=" ++ Session}]
+	end,
+    Request = {Url, Headers},
+    {ok, {{_,Code,_}, ReceivedHeaders, Body}}= httpc:request(Method, Request, [{timeout, 3000}], []),
+    NewSession =
+	case get_session(ReceivedHeaders) of
+	    error when Session /= undefined-> Session;
+	    {ok, NewSess} -> NewSess
+	end,
+    {Code, Body, NewSession}.
+
+
+get_session(Headers) ->
+    case proplists:get_value("set-cookie", Headers) of
+	undefined -> error;
+	Val ->
+	    get_session_loop(string:tokens(Val, "; "))
+    end.
+
+get_session_loop([])->
+    error;
+
+get_session_loop([H|T])->
+    case string:tokens(H, "=") of
+	["msession", Session] ->
+	    {ok, Session};
+	_Else ->
+	    get_session_loop(T) 
+    end.

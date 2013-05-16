@@ -92,9 +92,6 @@ set_cookie(MReq, CookieName, CookieVal) ->
 	      CookieVal, [], CReq),
     MReq#mreq{creq=CReq1}.
 
-
-
-
 %% @doc get minino session dict.
 -spec get_dict(MReq::minino_req()) -> Dict::dict().
 get_dict(MReq) ->
@@ -194,8 +191,8 @@ init([Mconf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({get_dict, MReq}, _From, State) ->
-    Reply =  get_dict_db(MReq),
+handle_call({get_dict, Data}, _From, State) ->
+    Reply =  get_dict_db(Data),
     {reply, Reply, State};
 
 handle_call({update_dict, MReq, Dict}, _From, State) ->
@@ -415,16 +412,16 @@ update_dict_db(MReq, Dict)->
 	    {ok, NewMReqSes}
     end.
 
-
-
-get_dict_db(MReq) ->
+get_dict_db(MReq=#mreq{}) ->
     MReqSession = MReq#mreq.session,
     Key = MReqSession#mreq_session.key,
+    get_dict_db(Key);
+
+get_dict_db(Key) when is_list(Key) ->
     case ets:lookup(?DB, Key) of
 	[] -> {error, "session not found"};
 	[S] -> S#stored_session.dict
     end.
 
-
 ask_purge_db(TimeSecs) ->
-  erlang:send_after(TimeSecs*1000, self(), purge_db).
+    erlang:send_after(TimeSecs*1000, self(), purge_db).
