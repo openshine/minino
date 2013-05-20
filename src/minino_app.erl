@@ -23,11 +23,10 @@ start(_StartType, _StartArgs) ->
     {ok, MConf} = minino_config:read_file(), 
     Port = proplists:get_value(port, MConf, 8080),
     ConfMediaUrl = proplists:get_value(media_url, MConf, ["media"]),
-    ConfMediaPath = proplists:get_value(media_path, MConf, "priv/static"),
     MediaUrl = "/" ++ string:join(ConfMediaUrl, "/") ++ "/[...]",
-    {ok, Cwd} = file:get_cwd(),
-    MediaPath = filename:join([Cwd, ConfMediaPath]),
-
+    MediaPath = proplists:get_value(media_path, MConf, "priv/static"),
+    error_logger:info_msg("media url: ~p~n", [MediaUrl]),
+    error_logger:info_msg("static dir: ~p~n", [MediaPath]),
     %% start cowboy
     Dispatch = cowboy_router:compile([
     				      {'_', [
@@ -54,3 +53,4 @@ start(_StartType, _StartArgs) ->
 
 stop(_State) ->
     ok.
+

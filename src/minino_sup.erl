@@ -42,8 +42,7 @@ init(Params) ->
     AppChildSpecs = 
     	try
     	   AppMod:add_children_to_main_sup(MConf)
-    	catch _:E ->
-		error_logger:info_msg("error: ~p~n", [E]),
+    	catch _:_E ->
     		[]
     	end,
 

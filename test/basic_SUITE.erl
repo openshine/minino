@@ -11,10 +11,12 @@
 	 hello_world_example_tests/1,
 	 upload_file_example_tests/1,
 	 miscellaneous_example_tests/1,
-	 sessions_example_tests/1
+	 sessions_example_tests/1,
+	 statics_example_tests/1
 	]).
 
 all() -> [
+	  statics_example_tests,
 	  sessions_example_tests,
 	  miscellaneous_example_tests,
 	  upload_file_example_tests,
@@ -23,6 +25,39 @@ all() -> [
 	  escript_tests, 
 	  simple_tests
 	 ].
+
+
+
+init_per_testcase(statics_example_tests, Config) ->
+    %% compile app
+    {ok, ExampleDir} = compile_example_mods(statics),   
+   
+    %% set settings.cfg file
+    Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
+    application:set_env(minino, settings_file, Settings),      
+
+    %% set templates dir
+    Templates = filename:join([ExampleDir, "priv", "templates"]),
+    application:set_env(minino, templates_dir, Templates),      
+
+
+    %% over write media_path 
+
+
+
+
+    %% TestDataDir = proplists:get_value(data_dir, Config),
+    Path = filename:join([ExampleDir, "priv", "statics"]),
+    application:set_env(minino, media_path, Path),    
+    
+
+    %% start inets
+    application:start(inets),
+
+    %%start minino
+    minino:start(),
+    Config;
+
 
 init_per_testcase(sessions_example_tests, Config) ->
     %% compile app
@@ -166,6 +201,32 @@ end_per_testcase(_Test, _Config) ->
     error_logger:info_msg("end test~n"),
     ok.
 
+%%======================================================
+%% statics_example_tests
+%%======================================================
+
+statics_example_tests(_Config)->
+    Url = "http://127.0.0.1:8000",
+    {200, _Body1, SessionKey} = request(Url),
+    Url1 = Url ++ "/media/text.txt",
+    error_logger:info_msg("url: ~p~n", [Url1]),
+    {200, Body2, SessionKey} = request(Url1, SessionKey),
+
+    error_logger:info_msg("body: ~p~n", [Body2]),
+
+
+
+    %% Url = "http://127.0.0.1:8000/media/logo.png",
+    %% {200, _Body1, SessionKey} = request(Url),
+    %% Dict1 = minino_api:get_session_dict(SessionKey),
+    %% error = dict:find("key", Dict1),
+    %% {200, _Body2, SessionKey} = request(Url ++ "?value=minino", SessionKey),
+    %% Dict2 = minino_api:get_session_dict(SessionKey),
+    %% {ok, "minino"} = dict:find("key", Dict2),
+    %% {200, _Body3, SessionKey} = request(Url ++ "?value=minino1", SessionKey),
+    %% Dict3 = minino_api:get_session_dict(SessionKey),
+    %% {ok, "minino1"} = dict:find("key", Dict3),
+    ok.
 
 %%======================================================
 %% sessions_example_tests

@@ -1,0 +1,12 @@
+{application, statics,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, {statics, []}},
+  {env, []}
+ ]}.
