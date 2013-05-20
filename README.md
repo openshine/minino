@@ -3,10 +3,11 @@
 * [What is Minino?](#about)
 * [Authors](#authors)
 * [Get Minino](#getminino)
-  * [Download](#download)    
-  * [Build](#build)    
+  * [Download](#download) 
+  * [Build](#build)
 * [Create a Minino Application](#createapp)
 * [Run Minino Server](#runserver)
+* [Examples](#examples)
 
 ## What is Minino? <a name="about"></a>
 
@@ -50,6 +51,8 @@ Port is an optional argument, it is 8000 by default.
 Check minino running at [http://localhost:8000](http://localhost:8000)
 
 
+##  Examples <a name="examples"></a>
+Check the examples [examples](./examples)
 
 
 
