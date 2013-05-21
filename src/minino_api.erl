@@ -15,6 +15,7 @@
 	 render_template/2,
 	 build_url/3,
 	 get_settings/1,
+	 get_cookies/1,
 	 get_cookie/2,
 	 set_cookie/3,
 	 get_session_dict/1,
@@ -73,6 +74,13 @@ get_session_dict(MReq) ->
 				 {ok, MReq1::minino_req()} | {error, Error::term()}.
 update_session_dict(MReq, Dict) ->
     minino_sessions:update_dict(MReq, Dict).
+
+
+
+%% @doc get cookies.
+-spec get_cookies(MReq::minino_req()) ->[{string(), string()}]|undefined.
+get_cookies(MReq) ->
+    minino_sessions:get_cookies(MReq).
 
 %% @doc get cookie.
 -spec get_cookie(MReq::minino_req(), CookieName::string()) -> string()|undefined.

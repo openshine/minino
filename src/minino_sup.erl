@@ -30,7 +30,7 @@ start_link(Params) ->
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
- 
+
 init(Params) ->
     [MConf] = Params,
     ConfServer = ?CHILD_WITH_PARAMS(minino_config, worker, Params),
@@ -38,14 +38,15 @@ init(Params) ->
     DispSup = ?CHILD_WITH_PARAMS(minino_dispatcher_sup, supervisor, Params),
     TempSup = ?CHILD_WITH_PARAMS(minino_templates_sup, supervisor, Params),
     Specs = [ConfServer, SessionsServer, DispSup, TempSup],
+    %% Specs = [ConfServer, SessionsServer, DispSup],
     AppMod = proplists:get_value(app_mod, MConf),
     AppChildSpecs = 
     	try
-    	   AppMod:add_children_to_main_sup(MConf)
+	    AppMod:add_children_to_main_sup(MConf)
     	catch _:_E ->
     		[]
     	end,
-
+    %% AppChildSpecs = [],
 
 
     {ok, {{one_for_one, 5, 10}, Specs ++ AppChildSpecs}}.

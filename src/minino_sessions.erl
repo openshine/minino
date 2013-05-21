@@ -15,6 +15,7 @@
 %% API
 -export([start_link/1]).
 -export([get_or_create/1,
+	 get_cookies/1,
 	 get_cookie/2,
 	 set_cookie/3,
 	 get_dict/1,
@@ -70,6 +71,17 @@ get_or_create(MReq) ->
     gen_server:call(?SERVER, {get_or_create_session, MReq}).
 
 
+%% @doc get cookies.
+-spec get_cookies(MReq::minino_req()) ->[{string(), string()}]|undefined.
+get_cookies(MReq) ->
+    CReq = MReq#mreq.creq,
+    case cowboy_req:cookies(CReq) of
+    	{undefined, _CReq} -> undefined;
+    	{List, _CReq} ->
+    	    [{binary_to_list(N), binary_to_list(V)} || {N,V} <- List]
+    end.
+    
+
 
 %% @doc get cookie.
 -spec get_cookie(MReq::minino_req(), CookieName::string()) -> string()|undefined.
@@ -86,11 +98,7 @@ get_cookie(MReq, CookieName) ->
 -spec set_cookie(MReq::minino_req(), CookieName::string(), CookieVal::string()) -> 
 			MReq1::minino_req() | {error, term()}.
 set_cookie(MReq, CookieName, CookieVal) ->
-    CReq = MReq#mreq.creq,
-    CReq1 = cowboy_req:set_resp_cookie(
-	      CookieName, 
-	      CookieVal, [], CReq),
-    MReq#mreq{creq=CReq1}.
+    gen_server:call(?SERVER, {set_cookie, MReq, CookieName, CookieVal}).
 
 %% @doc get minino session dict.
 -spec get_dict(MReq::minino_req()) -> Dict::dict().
@@ -191,6 +199,10 @@ init([Mconf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({set_cookie, MReq, CookieName, CookieVal}, _From, State) ->
+    Reply =  server_set_cookie(MReq, CookieName, CookieVal, State),
+    {reply, Reply, State};
+
 handle_call({get_dict, Data}, _From, State) ->
     Reply =  get_dict_db(Data),
     {reply, Reply, State};
@@ -323,6 +335,24 @@ create_key(SecrectKey) ->
     Str = lists:flatten(io_lib:format("~p", [now()])),
     Md5 = erlang:md5(Str ++ SecrectKey),
     lists:flatten([io_lib:format("~2.16.0b", [B]) || <<B>> <= Md5]).
+
+
+
+server_set_cookie(MReq, CookieName, CookieVal, State) ->
+    CReq = MReq#mreq.creq,
+    CookieName1 =
+	case CookieName of
+	    CookieName when is_list(CookieName) ->
+		list_to_binary(CookieName);
+	    CookieName -> CookieName
+	end,
+    CowBoyCookieOps = create_cowboy_cookie_ops(State),
+    CReq1 = cowboy_req:set_resp_cookie(
+    	      CookieName1, 
+    	      CookieVal, 
+	      CowBoyCookieOps,
+	      CReq),
+    MReq#mreq{creq=CReq1}.
 
 
 

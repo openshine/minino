@@ -13,10 +13,13 @@
 	 miscellaneous_example_tests/1,
 	 sessions_example_tests/1,
 	 statics_example_tests/1,
-	 templates_example_tests/1
+	 templates_example_tests/1,
+	 cookies_example_tests/1
 	]).
 
-all() -> [templates_example_tests,
+all() -> [
+	  cookies_example_tests,
+	  templates_example_tests,
 	  statics_example_tests,
 	  sessions_example_tests,
 	  miscellaneous_example_tests,
@@ -27,7 +30,24 @@ all() -> [templates_example_tests,
 	  simple_tests
 	 ].
 
+init_per_testcase(cookies_example_tests, Config) ->
+    %% compile app
+    {ok, ExampleDir} = compile_example_mods(cookies),   
+   
+    %% set settings.cfg file
+    Settings = filename:join([ExampleDir, "priv", "settings.cfg"]),
+    application:set_env(minino, settings_file, Settings),      
 
+    %% set templates dir
+    Templates = filename:join([ExampleDir, "priv", "templates"]),
+    application:set_env(minino, templates_dir, Templates),      
+
+    %% start inets
+    application:start(inets),
+
+    %%start minino
+    minino:start(),
+    Config;
 
 
 init_per_testcase(templates_example_tests, Config) ->
@@ -217,6 +237,44 @@ end_per_testcase(_Test, _Config) ->
     minino:stop(),
     error_logger:info_msg("end test~n"),
     ok.
+
+%%======================================================
+%% cookies_example_tests
+%%======================================================
+
+cookies_example_tests(_Config)->
+    Cookie = "cookietest",
+    Url = "http://127.0.0.1:8000",
+    {200, _Body1, SessionKey} = request(Url),
+    true = check_new_cookie(Url ++ "/?name=" ++ Cookie ++ "&value=12345", Cookie, SessionKey),
+    false = check_new_cookie(Url, Cookie, SessionKey),
+    ok.
+
+check_new_cookie(Url, NewCookie, SessionKey)->
+    Headers = 
+	case SessionKey of
+	    Undefined when Undefined == undefined ->
+		[];
+	    Session ->
+		
+		[{"Cookie", "msession=" ++ Session}]
+	end,
+    Request = {Url, Headers},
+    {ok, {{_, _Code,_}, ReceivedHeaders, _Body}}= httpc:request(get, Request, [{timeout, 3000}], []),
+    case proplists:get_value("set-cookie", ReceivedHeaders) of
+	undefined -> false;
+	Val ->
+	    lists:any(
+	      fun(E) ->
+		      Splited =  string:tokens(Val, "="),
+		      lists:member(NewCookie, Splited)
+	      end,
+	      string:tokens(Val, "; "))
+    end.
+
+
+
+
 
 %%======================================================
 %% templates_example_tests
@@ -475,7 +533,6 @@ request(Method, Url, Session) ->
 	    {ok, NewSess} -> NewSess
 	end,
     {Code, Body, NewSession}.
-
 
 get_session(Headers) ->
     case proplists:get_value("set-cookie", Headers) of
