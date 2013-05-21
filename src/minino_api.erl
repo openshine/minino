@@ -10,6 +10,20 @@
 -include("include/minino.hrl").
 
 
+%% Minino types
+-export_type([minino_req/0]).
+-export_type([template_path/0]).
+-export_type([template_args/0]).
+-export_type([minino_conf/0]).
+
+
+-type template_path() :: string().
+-type template_args() :: [{atom(), string()}].
+-type minino_req() :: hidden().
+-type minino_conf() :: [{term(),term()}].
+-type hidden() :: term().
+
+
 -export([response/2,
 	 path/1,
 	 render_template/2,
@@ -31,15 +45,26 @@
 	]).
 
 
+%% @doc Create a valid minino response.
+%% 
+%% @end
 
-response(Msg, MReq)->
+-spec response(Msg::{error, Code::integer()}|string(), MReq::minino_req()) -> R::hidden().
+response(Msg, MReq) ->
     minino_req:response(Msg, MReq).
 
+
+%% @doc get the request path
+%% 
+%% @end
+-spec path(MReq::minino_req()) -> string().
 path(MReq) ->
     minino_req:path(MReq).
 
 
 %% @doc render a template.
+%% 
+%% @end
 -spec render_template(template_path(), template_args()) -> {ok, string()} | {error, term()}.
 render_template(Template, Args) ->
     minino_templates:render(Template, Args).
@@ -47,6 +72,8 @@ render_template(Template, Args) ->
 
 
 %% @doc build url.
+%% <p>This function creates an url from a view id.</p>
+%% @end
 -spec build_url(Id::atom(), Args::[{Key::atom(), Value::string()}], MReq::minino_req()) -> 
 		       {ok, string()} | {error, term()}.
 build_url(Id, Args, MReq) ->
@@ -54,6 +81,8 @@ build_url(Id, Args, MReq) ->
     F(Id, Args).
 
 %% @doc get minino settings.
+%% 
+%% @end
 -spec get_settings(MReq::minino_req()) -> [term()]. 
 get_settings(MReq) ->
     MReq#mreq.mconf.
@@ -64,12 +93,16 @@ get_settings(MReq) ->
 %% Sessions
 
 %% @doc get minino session dict.
+%% 
+%% @end
 -spec get_session_dict(MReq::minino_req()) -> dict().
 get_session_dict(MReq) ->
     minino_sessions:get_dict(MReq).
 
 
 %% @doc update minino session dict.
+%% 
+%% @end
 -spec update_session_dict(MReq::minino_req(), Dict::dict()) -> 
 				 {ok, MReq1::minino_req()} | {error, Error::term()}.
 update_session_dict(MReq, Dict) ->
@@ -78,61 +111,86 @@ update_session_dict(MReq, Dict) ->
 
 
 %% @doc get cookies.
+%% 
+%% @end
 -spec get_cookies(MReq::minino_req()) ->[{string(), string()}]|undefined.
 get_cookies(MReq) ->
     minino_sessions:get_cookies(MReq).
 
 %% @doc get cookie.
+%% 
+%% @end
 -spec get_cookie(MReq::minino_req(), CookieName::string()) -> string()|undefined.
 get_cookie(MReq, CookieName) ->
     minino_sessions:get_cookie(MReq, CookieName).
 
 %% @doc set cookie.
+%% 
+%% @end
 -spec set_cookie(MReq::minino_req(), CookieName::string(), CookieVal::string()) -> 
 			MReq1::minino_req() | {error, term()}.
 set_cookie(MReq, CookieName, CookieVal) ->
     minino_sessions:set_cookie(MReq, CookieName, CookieVal).
 
 %% @doc get session cookie domain
+%% 
+%% @end
 -spec get_session_cookie_domain() -> string().
 get_session_cookie_domain() ->
     minino_sessions:get_session_cookie_domain().
 
 
 %% @doc get session cookie httponly
+%% 
+%% @end
 -spec get_session_cookie_httponly() ->  true | false.
 get_session_cookie_httponly() ->
     minino_sessions:get_session_cookie_httponly().
 
 
 %% @doc get session cookie path
+%% 
+%% @end
 -spec get_session_cookie_path() ->  string().
 get_session_cookie_path() ->
     minino_sessions:get_session_cookie_path().
 
 %% @doc get session cookie secure
+%% 
+%% @end
 -spec get_session_cookie_secure() ->  true | false.
 get_session_cookie_secure() ->
     minino_sessions:get_session_cookie_secure().
 
 
 %% @doc get file
+%% 
+%% @end
 -spec get_file(MReq::minino_req(), Path::string()) -> ok | {error, Error::term()}.
 get_file(MReq, Path) ->
     minino_cowboy_handler:get_file(MReq, Path).
 
 %% @doc get method
+%% 
+%% @end
 -spec get_method(MReq::minino_req()) -> string().
 get_method(MReq) ->
     minino_req:get_method(MReq).
 
 %% @doc get conf
+%% 
+%% @end
 -spec get_conf() -> [tuple()].
 get_conf() ->
     minino_config:get().
 
 
 %% @doc get request args
+%% 
+%% @end
 -spec url_params(MReq::minino_req()) -> [{Key::binary(), Value::binary()}].
 url_params(MReq) ->
     minino_req:get_params(MReq).
+
+
+%% @docfile "doc/module.edoc"

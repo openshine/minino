@@ -41,7 +41,7 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
+%% @spec start_link(Params::[term()]) -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 start_link(Params) ->
@@ -191,10 +191,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-%% @spec create_disp_fun(DispRules) -> F
+%% @spec create_match_fun(DispRules::[rule()]) -> F::fun()
 %% DispRules = [rule()]
-%% rule() =  {Id::atom(), Path::[string()|atom()], view::atom()}, 
-%% F::fun() 
+%% rule() =  {Id::atom(), Path::[string()|atom()], View::atom()}
+%% 
 %% @end
 create_match_fun(DispRules)->
     ParsedRules = [parse_rule(Rule) || Rule <- DispRules],

@@ -8,6 +8,8 @@
 * [Create a Minino Application](#createapp)
 * [Run Minino Server](#runserver)
 * [Examples](#examples)
+* [Documentation](#doc)
+
 
 ## What is Minino? <a name="about"></a>
 
@@ -54,6 +56,14 @@ Check minino running at [http://localhost:8000](http://localhost:8000)
 ##  Examples <a name="examples"></a>
 Check the examples [examples](./examples)
 
+
+##  Documentation <a name="doc"></a>
+To create the minino documentation type the following command.
+
+```sh
+$ make doc
+```
+Please check doc/index.html
 
 
 

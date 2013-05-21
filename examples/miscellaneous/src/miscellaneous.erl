@@ -2,26 +2,20 @@
 
 -module(miscellaneous).
 
+-record(state, {}).
+
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+
+
 %% minino funs
 -export([init/1,
 	 dispatch_rules/0,
 	 add_children_to_main_sup/1
 	]).
 
-
-
-
-
-
 %% views
 -export([home_view/3
 	 ]).
-
--record(state, {}).
-
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
-
-
 
 %% minino funs
 
