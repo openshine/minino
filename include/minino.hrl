@@ -1,3 +1,10 @@
+-type template_path() :: string().
+-type template_args() :: [{atom(), string()}].
+-type minino_req() :: hidden().
+-type minino_conf() :: [{term(),term()}].
+-type hidden() :: term().
+
+
 -record(mreq,  {creq,
 		build_url_fun,
 		mconf,

@@ -2,27 +2,12 @@
 %%% @author Pablo Vieytes <pvieytes@openshine.com>
 %%% @copyright (C) 2013, Openshine s.l.
 %%% @doc
-%%%
+%%% Minino api. 
 %%% @end
 %%% Created :  15 Mar 2013 by Pablo Vieytes <pvieytes@openshine.com>
 %%%-------------------------------------------------------------------
 -module(minino_api).
 -include("include/minino.hrl").
-
-
-%% Minino types
--export_type([minino_req/0]).
--export_type([template_path/0]).
--export_type([template_args/0]).
--export_type([minino_conf/0]).
-
-
--type template_path() :: string().
--type template_args() :: [{atom(), string()}].
--type minino_req() :: hidden().
--type minino_conf() :: [{term(),term()}].
--type hidden() :: term().
-
 
 -export([response/2,
 	 path/1,
@@ -192,5 +177,3 @@ get_conf() ->
 url_params(MReq) ->
     minino_req:get_params(MReq).
 
-
-%% @docfile "doc/module.edoc"
