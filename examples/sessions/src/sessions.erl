@@ -10,14 +10,12 @@
 %% views
 -export([home_view/3]).
 
--record(state, {}).
-
 -define(KEY, "key").
 
 %% minino funs
 
 init(_MConf) ->
-    {ok, #state{}}.
+    {ok, []}.
 
 dispatch_rules() ->
     [%% {Id::atom(), Path::[string()|atom()], view::atom()}
@@ -26,7 +24,7 @@ dispatch_rules() ->
 
 
 %% views
-home_view(MReq, _Args, _State) ->
+home_view(MReq, _Args, _Term) ->
     ReqParams = minino_api:url_params(MReq), 
     Dict = minino_api:get_session_dict(MReq),
     Value = 

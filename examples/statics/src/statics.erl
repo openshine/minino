@@ -10,12 +10,10 @@
 %% views
 -export([home_view/3]).
 
--record(state, {}).
-
 %% minino funs
 
 init(_MConf) ->
-    {ok, #state{}}.
+    {ok, []}.
 
 dispatch_rules() ->
     [%% {Id::atom(), Path::[string()|atom()], view::atom()}
@@ -25,6 +23,6 @@ dispatch_rules() ->
 
 %% views
 
-home_view(MReq, _Args, _State) ->
+home_view(MReq, _Args, _Term) ->
     {ok, Html} = minino_api:render_template("home.html", [{text, "Meow!!"}]),
     minino_api:response(Html, MReq).

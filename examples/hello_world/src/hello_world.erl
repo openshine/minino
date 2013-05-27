@@ -10,12 +10,10 @@
 %% views
 -export([home_view/3]).
 
--record(state, {}).
-
 %% minino funs
 
 init(_MConf) ->
-    {ok, #state{}}.
+    {ok, []}.
 
 
 
@@ -25,5 +23,5 @@ dispatch_rules() ->
     ].
 
 %% views
-home_view(MReq, _Args, _State) ->
+home_view(MReq, _Args, _Term) ->
     minino_api:response("Hello world!!", MReq).

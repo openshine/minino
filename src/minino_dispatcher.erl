@@ -28,7 +28,7 @@
 		mconf,
 		match_fun,
 		build_url_fun,
-		app_state
+		app_term
 	       }).
 
 
@@ -79,12 +79,12 @@ init([MConf]) ->
     MApp = proplists:get_value(app_mod, MConf),
     MatchFun = create_match_fun(MApp:dispatch_rules()),
     BuildUrlFun = create_build_url_fun(MApp:dispatch_rules()),
-    {ok, AppState} =  MApp:init(MConf),
+    {ok, AppTerm} =  MApp:init(MConf),
     {ok, #state{mapp=MApp,
 		mconf=MConf,
 		build_url_fun=BuildUrlFun,
 		match_fun=MatchFun,
-		app_state=AppState
+		app_term=AppTerm
 	       }}.
 
 
@@ -106,9 +106,9 @@ handle_call(update_rules, _From, State) ->
     MApp =State#state.mapp,
     Rules = MApp:dispatch_rules(),
     MatchFun = create_match_fun(Rules),
-    {ok, AppState} =  MApp:init(State#state.mconf),
+    {ok, AppTerm} =  MApp:init(State#state.mconf),
     {reply, ok, State#state{match_fun=MatchFun,
-			   app_state=AppState}};
+			   app_term=AppTerm}};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -139,7 +139,7 @@ handle_cast({dispatch, MReq, From, Ref}, State) ->
     	      State#state.match_fun,  
     	      State#state.build_url_fun,
     	      State#state.mconf, 
-	      State#state.app_state,
+	      State#state.app_term,
     	      From, 
 	      Ref],
     gen_server:cast(Pid, {work, Params}),

@@ -57,7 +57,7 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, MConf, AppState, From, Ref]}, State) ->
+handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, MConf, AppTerm, From, Ref]}, State) ->
     MReq2 = MReq#mreq{build_url_fun=BuildUrlFun, mconf=MConf, from=From},
     Path = minino_api:path(MReq2),
     Response =
@@ -66,7 +66,7 @@ handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, MConf, AppState, From, Re
     		minino_api:response({error, 404}, MReq2);
     	    {View, Args} ->
 		try
-		    MApp:View(MReq2, Args, AppState)
+		    MApp:View(MReq2, Args, AppTerm)
 		catch Class:Exception ->
 			ErrorMsg =
 			    "error in ~p:~p ~n" ++

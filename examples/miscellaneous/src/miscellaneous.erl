@@ -2,10 +2,7 @@
 
 -module(miscellaneous).
 
--record(state, {}).
-
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
-
 
 %% minino funs
 -export([init/1,
@@ -26,7 +23,7 @@ add_children_to_main_sup(_MConf) ->
     
 
 init(_MConf) ->
-    {ok, #state{}}.
+    {ok, []}.
 
 dispatch_rules() ->
     [%% {Id::atom(), Path::[string()|atom()], view::atom()}
@@ -35,7 +32,7 @@ dispatch_rules() ->
 
 
 %% views
-home_view(MReq, _Args, _State) ->
+home_view(MReq, _Args, _Term) ->
     {ok, Html} = minino_api:render_template("home.html", [{text, "Meow!!"}]),
     minino_api:response(Html, MReq).
 
