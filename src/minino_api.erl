@@ -26,6 +26,7 @@
 	 get_file/2,
 	 get_method/1,
 	 get_conf/0,
+	 read_settings_file/0,
 	 url_params/1
 	]).
 
@@ -65,15 +66,13 @@ build_url(Id, Args, MReq) ->
     F = MReq#mreq.build_url_fun,
     F(Id, Args).
 
+
 %% @doc get minino settings.
 %% 
 %% @end
 -spec get_settings(MReq::minino_req()) -> [term()]. 
 get_settings(MReq) ->
     MReq#mreq.mconf.
-
-
-
 
 %% Sessions
 
@@ -168,6 +167,14 @@ get_method(MReq) ->
 -spec get_conf() -> [tuple()].
 get_conf() ->
     minino_config:get().
+
+
+%% @doc read minino settings file.
+%% 
+%% @end
+-spec read_settings_file() -> {ok, [term()]} | {error, Error::term()}. 
+read_settings_file() ->
+    minino_config:read_file().
 
 
 %% @doc get request args

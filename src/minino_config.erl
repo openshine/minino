@@ -14,7 +14,9 @@
 
 %% API
 -export([start_link/1]).
--export([get/0, read_file/0]).
+-export([get/0, 
+	 read_file/0
+	]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -41,6 +43,7 @@ start_link(Params) ->
 get()->
     gen_server:call(?SERVER, get_conf).
 
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -57,7 +60,6 @@ get()->
 %% @end
 %%--------------------------------------------------------------------
 init([MConf]) ->
-    %% Conf = read_conf(),
     {ok, #state{conf=MConf}}.
 
 %%--------------------------------------------------------------------
