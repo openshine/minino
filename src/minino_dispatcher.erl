@@ -310,10 +310,21 @@ create_build_url_fun(DispRules) ->
 %% -spec create_build_url_fun(Id::atom(), Args::[{Key::atom(), Val::string()}], [rule()]) -> 
 %%       			  {ok, Url::string()} | {error, term()}
 build_url(Id, Args, DispRules) ->
-    case  get_path_loop(DispRules, Id) of
-	undefined -> undefined;
-	Path ->
-	    url_append_items(Path, Args, [])
+    Checked = lists:all(
+		fun({Key, Value}) when is_atom(Key), is_list(Value)->
+			true;
+		   (_)-> false
+		end,
+		Args),
+    case Checked of
+	true ->
+	    case  get_path_loop(DispRules, Id) of
+		undefined -> undefined;
+		Path ->
+		    url_append_items(Path, Args, [])
+	    end;
+	false ->
+	    {error, "Args. Type not vaild"}
     end.
 	
 

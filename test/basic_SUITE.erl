@@ -466,6 +466,9 @@ check_build_urls() ->
     F = minino_dispatcher:create_build_url_fun(DRules),
     "/" = F(root_page, []),
     "/home" = F(home_page, []),
+    {error, _} = F(test_page, [{"testvalue", "data"}]),
+    {error, _} = F(test_page, [{testvalue, data}]),
+    {error, _} = F(test_page, ["data"]),
     "/test/data" = F(test_page, [{testvalue, "data"}]),
     ok.
 
