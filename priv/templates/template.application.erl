@@ -9,13 +9,12 @@
 
 %% views
 -export([home_view/3,
-	 test_view/3,
-	 upload_view/3]).
+	 test_view/3]).
 
 %% minino funs
 
 init(_MConf) ->
-    {ok, #state{}}.
+    {ok, []}.
 
 dispatch_rules() ->
     [%% {Id::atom(), Path::[string()|atom()], view::atom()}
