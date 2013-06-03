@@ -1,0 +1,79 @@
+@title An Erlang web miniframework.
+@author Pablo Vieytes <pvieytes@openshine.com>
+@copyright (C) 2013, Openshine s.l. 
+@doc
+  <h1>Minino</h1>
+
+<ul>
+      <li><a href="#about">What is Minino?</a></li>
+      <li><a href="#authors">Authors</a></li>
+      <li><a href="#getminino">Get Minino</a>
+	<ul>
+	  <li><a href="#download">Download</a> </li>
+	  <li><a href="#build">Build</a></li>
+	</ul></li>
+      <li><a href="#createapp">Create a Minino Application</a></li>
+      <li><a href="#runserver">Run Minino Server</a></li>
+      <li><a href="#examples">Examples</a></li>
+     <li><a href="#code">Code</a></li>
+    </ul>
+
+
+
+ <h2><a name="about"></a>What is Minino?</h2>
+    <p>An Erlang web miniframework.</p>
+
+    <h2><a name="authors">Authors</a></h2>
+    <p>This is an <a href="http://www.openshine.com/">Openshine</a> project developed by:</p>
+
+    <ul>	
+      <li>Pablo Vieytes</li>
+    </ul>
+
+    <h2><a name="getminino">Get Minino</a></h2>
+
+    <h3><a name="download"></a>Download</h3>
+
+    <p>Not available yet.</p>
+
+    <h3><a name="build"></a>Build</h3>
+
+    <p>Get the source and build it.</p>
+
+    <div><pre>
+	$ git clone git@github.com:openshine/minino.git
+	$ minino
+	$ make
+    </pre></div>
+
+    <h2><a name="createapp"></a>Create a Minino Application</h2>
+    <div><pre>
+	$ mkdir kitty
+	$ cd kitty
+	$ cp /path/to/minino/bin/minino .
+	$ ./minino create-app id=kitty
+	$ ./rebar get-deps compile
+    </pre></div>
+
+    <h2><a name="runserver"></a>Run Minino Server</h2>
+
+    <div><pre>
+	$ ./minino runserver [Port]
+    </pre></div>
+
+
+    <p>Port is an optional argument, it is 8000 by default.</p>
+
+    <p>Check minino running at <a href="http://localhost:8000/">http://localhost:8000</a></p>
+
+    <h2><a name="examples"></a>Examples</h2>
+
+    <p>Check the examples at <a href="https://github.com/openshine/minino/examples">https://github.com/openshine/minino/examples</a></p>
+
+    <h2><a name="code"></a>Code</h2>
+
+   <p>Check the code at <a href="https://github.com/openshine/minino">https://github.com/openshine/minino</a></p>
+
+@end
+
+

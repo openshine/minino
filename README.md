@@ -1,17 +1,19 @@
 #Minino
 
-an Erlang miniframework
 * [What is Minino?](#about)
 * [Authors](#authors)
 * [Get Minino](#getminino)
-  * [Download](#download)    
-  * [Build](#build)    
-* [Create a minino application](#createapp)
-  
+  * [Download](#download) 
+  * [Build](#build)
+* [Create a Minino Application](#createapp)
+* [Run Minino Server](#runserver)
+* [Examples](#examples)
+* [Documentation](#doc)
+
 
 ## What is Minino? <a name="about"></a>
 
-An Erlang miniframework
+An Erlang web miniframework.
 
 ## Authors <a name="authors"></a>
 
@@ -27,14 +29,12 @@ Not available yet.
 Get the source and build it.
 
 ```sh
-$ git clone git@github.com:pvieytes/minino.git
+$ git clone git@github.com:openshine/minino.git
 $ cd minino
-$ ./rebar get-deps compile
-$ ./bootstrap
+$ make
 ```
 
 ##  Create a Minino Application <a name="createapp"></a>
-
 
 ```sh
 $ mkdir kitty
@@ -42,13 +42,28 @@ $ cd kitty
 $ cp /path/to/minino/bin/minino .
 $ ./minino create-app id=kitty
 $ ./rebar get-deps compile
-$ ./minino start
 ```
+##  Run Minino Server <a name="runserver"></a>
+
+```sh
+$ ./minino runserver [Port]
+```
+Port is an optional argument, it is 8000 by default.
+
+Check minino running at [http://localhost:8000](http://localhost:8000)
 
 
+##  Examples <a name="examples"></a>
+Check the examples [examples](./examples)
 
 
+##  Documentation <a name="doc"></a>
+To create the minino documentation type the following command.
 
+```sh
+$ make doc
+```
+Please check doc/index.html
 
 
 

@@ -1,0 +1,19 @@
+<html>
+  <body>
+    
+    <p>Set cookie:
+      <form>
+	name: <input type="text" name="name"><br>
+	value: <input type="text" name="value"><br>
+	<input type="submit" value="Submit">
+      </form>
+    </p>
+
+    <h3>Cookies:</h3>
+     <ul>
+	 {% for c in cookies %}
+	 <li>{{ c }}</li>
+	 {% endfor %}
+    </ul>
+  </body>
+</html>

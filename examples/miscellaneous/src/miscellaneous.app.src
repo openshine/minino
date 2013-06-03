@@ -1,0 +1,12 @@
+{application, miscellaneous,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, {miscellaneous, []}},
+  {env, []}
+ ]}.

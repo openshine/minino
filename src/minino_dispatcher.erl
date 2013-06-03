@@ -1,4 +1,32 @@
 %%%-------------------------------------------------------------------
+%%% Copyright (c) Openshine s.l.  and individual contributors.
+%%% All rights reserved.
+%%% 
+%%% Redistribution and use in source and binary forms, with or without modification,
+%%% are permitted provided that the following conditions are met:
+%%% 
+%%%     1. Redistributions of source code must retain the above copyright notice, 
+%%%        this list of conditions and the following disclaimer.
+%%%     
+%%%     2. Redistributions in binary form must reproduce the above copyright 
+%%%        notice, this list of conditions and the following disclaimer in the
+%%%        documentation and/or other materials provided with the distribution.
+%%% 
+%%%     3. Neither the name of Minino nor the names of its contributors may be used
+%%%        to endorse or promote products derived from this software without
+%%%        specific prior written permission.
+%%% 
+%%% THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+%%% ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+%%% WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+%%% DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+%%% ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+%%% (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+%%% LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+%%% ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+%%% (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+%%% SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+%%% 
 %%% @author Pablo Vieytes <pvieytes@openshine.com>
 %%% @copyright (C) 2013, Openshine s.l.
 %%% @doc
@@ -13,8 +41,10 @@
 %% API
 -export([start_link/1,
 	 dispatch/1,
-	 response/2,
-	 update_rules/0]).
+	 response/3,
+	 update_rules/0,
+	 create_match_fun/1,
+	 create_build_url_fun/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -24,10 +54,12 @@
 
 -record(state, {mapp,
 		mconf,
-		match_fun}).
+		match_fun,
+		build_url_fun,
+		app_term
+	       }).
 
 
--compile([export_all]).
 
 %%%===================================================================
 %%% API
@@ -37,20 +69,20 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
+%% @spec start_link(Params::[term()]) -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 start_link(Params) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Params, []).
 
 
-dispatch(Req) ->
-    gen_server:call(?SERVER, {dispatch, Req}).
+dispatch(MReq) ->
+    Ref = make_ref(),
+    gen_server:cast(?SERVER, {dispatch, MReq, self(), Ref}),
+    Ref.
 
-
-response(To, MResponse) ->
-    gen_server:reply(To, MResponse).
-
+response(To, MResponse, Ref) ->
+    To ! {response, Ref, MResponse}.
 
 update_rules() ->
     gen_server:call(?SERVER, update_rules).
@@ -74,11 +106,15 @@ update_rules() ->
 init([MConf]) ->
     MApp = proplists:get_value(app_mod, MConf),
     MatchFun = create_match_fun(MApp:dispatch_rules()),
+    BuildUrlFun = create_build_url_fun(MApp:dispatch_rules()),
+    {ok, AppTerm} =  MApp:init(MConf),
     {ok, #state{mapp=MApp,
 		mconf=MConf,
-		match_fun=MatchFun
+		build_url_fun=BuildUrlFun,
+		match_fun=MatchFun,
+		app_term=AppTerm
 	       }}.
- 
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -94,27 +130,13 @@ init([MConf]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({dispatch, Req}, From, State) ->
-    %% create worker process
-    Params = [Req, 
-	      State#state.mapp, 
-	      State#state.match_fun,  
-	      State#state.mconf, 
-	      From],
-    WSpec = {make_ref(), 
-	     {minino_req_worker, start_link, [Params]}, 
-	     permanent, 
-	     5000, 
-	     worker, 
-	     dynamic},
-    {_, {normal_stop, _}} = supervisor:start_child(minino_dispatcher_sup, WSpec),
-    {noreply, State};
-
 handle_call(update_rules, _From, State) ->
     MApp =State#state.mapp,
-    R = MApp:dispatch_rules(),
-    MatchFun = create_match_fun(R),
-    {reply, ok, State#state{match_fun=MatchFun}};
+    Rules = MApp:dispatch_rules(),
+    MatchFun = create_match_fun(Rules),
+    {ok, AppTerm} =  MApp:init(State#state.mconf),
+    {reply, ok, State#state{match_fun=MatchFun,
+			   app_term=AppTerm}};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -131,6 +153,25 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 
+handle_cast({dispatch, MReq, From, Ref}, State) ->
+    %% create worker process
+    WSpec = {make_ref(), 
+    	     {minino_req_worker, start_link, []}, 
+    	     permanent, 
+	     5000, 
+	     worker, 
+	     dynamic},
+    {ok, Pid} = supervisor:start_child(minino_dispatcher_sup, WSpec),
+    Params = [MReq, 
+    	      State#state.mapp, 
+    	      State#state.match_fun,  
+    	      State#state.build_url_fun,
+    	      State#state.mconf, 
+	      State#state.app_term,
+    	      From, 
+	      Ref],
+    gen_server:cast(Pid, {work, Params}),
+    {noreply, State};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -178,10 +219,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-%% @spec create_disp_fun(DispRules) -> F
+%% @spec create_match_fun(DispRules::[rule()]) -> F::fun()
 %% DispRules = [rule()]
-%% rule() =  {Id::atom(), Path::[string()|atom()], view::atom()}, 
-%% F::fun() 
+%% rule() =  {Id::atom(), Path::[string()|atom()], View::atom()}
+%% 
 %% @end
 create_match_fun(DispRules)->
     ParsedRules = [parse_rule(Rule) || Rule <- DispRules],
@@ -242,13 +283,19 @@ append_match({tail}, {M, R, C}) ->
 
 append_match(Var, {M, R, C}) when is_atom(Var) ->
     V = lists:flatten(io_lib:format("V~p", [C])),
+    TupleStr = 
+	"{" ++ 
+	erlang:atom_to_list(Var) ++ 
+	", " ++
+	V ++ 
+	"}",
     case M of
 	"" -> {V, V, C+1};
 	M -> 
 	    M1 = M ++ ", " ++ V,
 	    R1 = case R of
-		     "" -> V; 
-		     R -> R ++ ", " ++ V
+		     "" -> TupleStr; 
+		     R -> R ++ ", " ++ TupleStr
 		 end,
 	    {M1, R1, C+1}
     end;
@@ -276,3 +323,63 @@ close_match({M, R, C})->
 escp(S) -> "\"" ++ S ++ "\"".
     
 
+
+%% @doc create build url fun
+%% -spec create_build_url_fun(Rules::[rule()]) -> fun()
+create_build_url_fun(DispRules) ->
+    fun(Id, Args) ->
+	    build_url(Id, Args, DispRules)
+    end.
+
+
+
+
+%% @doc build url
+%% -spec create_build_url_fun(Id::atom(), Args::[{Key::atom(), Val::string()}], [rule()]) -> 
+%%       			  {ok, Url::string()} | {error, term()}
+build_url(Id, Args, DispRules) ->
+    Checked = lists:all(
+		fun({Key, Value}) when is_atom(Key), is_list(Value)->
+			true;
+		   (_)-> false
+		end,
+		Args),
+    case Checked of
+	true ->
+	    case  get_path_loop(DispRules, Id) of
+		undefined -> undefined;
+		Path ->
+		    url_append_items(Path, Args, [])
+	    end;
+	false ->
+	    {error, "Args. Type not vaild"}
+    end.
+	
+
+get_path_loop([], _Id)->
+    undefined; 
+get_path_loop([{Id, Path,_}|_], Id) ->
+    Path;
+get_path_loop([_|Tail], Id) ->
+    get_path_loop(Tail, Id).
+
+
+url_append_items([], _args, Acc) ->
+    "/" ++ string:join(lists:reverse(Acc), "/");
+
+url_append_items([E|T], Args, Acc) ->
+    Val =
+	case E of
+	    E when is_atom(E) ->
+		case proplists:get_value(E, Args) of
+		    V when V /= undefined ->
+			V
+		end;
+	    E when is_list(E)->
+		E
+	end,
+    url_append_items(T, Args, [Val|Acc]).
+
+    
+	    
+		  
