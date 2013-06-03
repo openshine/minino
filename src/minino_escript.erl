@@ -212,18 +212,7 @@ create_app(AppName) ->
 	    HomeBin = get_bin("template.home.html"),
 	    filelib:ensure_dir(HomeTemplatePath),
 	    file:write_file(HomeTemplatePath, HomeBin)
-    end,
-    UploadTemplatePath = filename:join(["priv", "templates", "uploadfile.html"]),
-    case filelib:is_regular(UploadTemplatePath) of
-	true -> 
-	    ignore;
-	false ->
-	    UploadBin = get_bin("template.uploadfile.html"),
-	    filelib:ensure_dir(UploadTemplatePath),
-	    file:write_file(UploadTemplatePath, UploadBin)
-    end,
-
-    ok.
+    end.
 
 get_bin(FileName) ->
     {ok, PropList} = escript:extract("minino", []),
