@@ -144,25 +144,6 @@ command(CommandArgs)->
 create_app(AppName) ->
     io:format("~s app created.~n", [AppName]),
 
-    %% copy rebar bin
-    case filelib:is_regular("rebar") of
-    	true -> 
-    	    ignore;
-    	false ->
-    	    RebarBin = get_bin("rebar"),
-    	    file:write_file("rebar", RebarBin),
-    	    os:cmd("chmod 0755 rebar")
-    end,
-
-    %% create rebar.config
-    case filelib:is_regular("rebar.config") of
-    	true -> 
-	    ignore;
-    	false ->
-	    RConfBin = get_bin("template.rebar.config"),
-	    file:write_file("rebar.config", RConfBin)
-    end,
-
     %%create app
     AppFileName = filename:join(["src", AppName ++ ".erl"]),
     case filelib:is_regular(AppFileName) of

@@ -22,7 +22,7 @@ get_files() ->
     Ebin = filelib:wildcard(filename:join("ebin", "*")),
     Deps = filelib:wildcard(filename:join(["deps", "*", "ebin", "*"])),
     Templates = filelib:wildcard(filename:join(["priv", "templates", "*"])),
-    BeamPaths = ["rebar"] ++  Ebin ++ Deps ++ Templates,
+    BeamPaths = Ebin ++ Deps ++ Templates,
     lists:foldl(
       fun(Path, Acc) ->
     	      {ok, Bin} = file:read_file(Path),
