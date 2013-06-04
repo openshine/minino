@@ -42,7 +42,9 @@
 	[
 	 %%{Name::string(), Help()::string(), Available:: always | appcreated
 	 {"create-app", "create a new app; create-app id=myapp", always},
-	 {"runserver", "runserver [port]", appcreated}
+	 {"runserver", "runserver [port]", appcreated},
+	 {"compile", "compile", appcreated}
+
 	]).
 
 %% API
@@ -133,8 +135,12 @@ command(CommandArgs)->
 	    	    application:set_env(minino, mport, Port);
 	    	_ -> ignore
 	    end,
+	    compile_files(),
 	    ok = minino:start(),
 	    timer:sleep(infinity);
+	["compile"|_Args] ->
+	    compile_files(),
+	    io:format("~n");
 	_ -> notavailable
     end.
 
@@ -229,3 +235,19 @@ create_random_string(Length, Counter, Acc)->
     Char = random:uniform(LastChar - FirstChar + 1) + FirstChar - 1,
     create_random_string(Length, Counter + 1, [Char|Acc]).
     
+
+
+compile_files()->
+    Files = filelib:wildcard("src/*.erl"),
+    Opts = [verbose,
+	    report_errors,
+	    report_warnings,
+	    {i, ["include"]}
+	   ],
+    lists:foreach(
+      fun(Path) ->
+	      Result = compile:file(Path, Opts),
+	      io:format("compile ~p -> ~p", [Path, Result]),
+	      {ok, _Mod} = Result
+      end,
+      Files).
