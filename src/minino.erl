@@ -1,4 +1,3 @@
-
 %%%-------------------------------------------------------------------
 %%% Copyright (c) Openshine s.l.  and individual contributors.
 %%% All rights reserved.
@@ -58,7 +57,12 @@ stop()->
     application:stop(crypto),
     application:stop(ranch),
     application:stop(cowboy),
-    application:stop(minino).
+    application:stop(minino),
+    try 
+	minino_shell ! stop
+    catch _:_ -> 
+	    ignore
+    end.
 
 
 ensure_start(App) ->

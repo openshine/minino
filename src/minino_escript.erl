@@ -43,6 +43,7 @@
 	 %%{Name::string(), Help()::string(), Available:: always | appcreated
 	 {"create-app", "create a new app; create-app id=myapp", always},
 	 {"runserver", "runserver [port]", appcreated},
+	 {"debug", "debug [port]", appcreated},
 	 {"compile", "compile", appcreated}
 
 	]).
@@ -129,21 +130,29 @@ command(CommandArgs)->
 	["create-app",[$i,$d,$=|AppName]] ->
 	    create_app(AppName);
 	["runserver" | PortList] ->
-	    case PortList of
-	    	[PStr] when is_list(PStr) ->	
-		    {Port, _} = string:to_integer(PStr),
-	    	    application:set_env(minino, mport, Port);
-	    	_ -> ignore
-	    end,
-	    compile_files(),
-	    ok = minino:start(),
-	    timer:sleep(infinity);
+	    runserver(PortList, nodebug);
+     	["debug" | PortList] ->
+	    runserver(PortList, debug);
 	["compile"|_Args] ->
 	    compile_files(),
 	    io:format("~n");
 	_ -> notavailable
     end.
 
+
+runserver(PortList, Mode) ->
+    case PortList of
+	[PStr] when is_list(PStr) ->	
+	    {Port, _} = string:to_integer(PStr),
+	    application:set_env(minino, mport, Port);
+	_ -> ignore
+    end,
+    compile_files(),
+    ok = minino:start(),
+    case Mode of 
+	nodebug -> timer:sleep(infinity);
+	debug -> debug_mode()
+    end.
 
 
 
@@ -239,10 +248,13 @@ create_random_string(Length, Counter, Acc)->
 
 compile_files()->
     Files = filelib:wildcard("src/*.erl"),
+    ok = filelib:ensure_dir("ebin/dummy.file"),
     Opts = [verbose,
 	    report_errors,
 	    report_warnings,
-	    {i, ["include"]}
+	    {i, ["include"]},
+	    {outdir, "ebin"}
+	    
 	   ],
     lists:foreach(
       fun(Path) ->
@@ -251,3 +263,10 @@ compile_files()->
 	      {ok, _Mod} = Result
       end,
       Files).
+
+debug_mode() ->
+    spawn(fun user_drv:start/0),
+    erlang:register(minino_shell, self()),
+    receive
+	stop -> ignore
+    end.
