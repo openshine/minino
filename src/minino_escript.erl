@@ -247,22 +247,27 @@ create_random_string(Length, Counter, Acc)->
 
 
 compile_files()->
-    Files = filelib:wildcard("src/*.erl"),
-    ok = filelib:ensure_dir("ebin/dummy.file"),
-    Opts = [verbose,
-	    report_errors,
-	    report_warnings,
-	    {i, ["include"]},
-	    {outdir, "ebin"}
-	    
-	   ],
-    lists:foreach(
-      fun(Path) ->
-	      Result = compile:file(Path, Opts),
-	      io:format("compile ~p -> ~p", [Path, Result]),
-	      {ok, _Mod} = Result
-      end,
-      Files).
+    case filelib:is_regular("rebar") of
+	true ->
+	    rebar_compilation();
+	false ->
+	    Files = filelib:wildcard("src/*.erl"),
+	    ok = filelib:ensure_dir("ebin/dummy.file"),
+	    Opts = [verbose,
+		    report_errors,
+		    report_warnings,
+		    {i, ["include"]},
+		    {outdir, "ebin"}
+		    
+		   ],
+	    lists:foreach(
+	      fun(Path) ->
+		      Result = compile:file(Path, Opts),
+		      io:format("compile ~p -> ~p", [Path, Result]),
+		      {ok, _Mod} = Result
+	      end,
+	      Files)
+    end.
 
 debug_mode() ->
     spawn(fun user_drv:start/0),
@@ -270,3 +275,7 @@ debug_mode() ->
     receive
 	stop -> ignore
     end.
+
+rebar_compilation() ->
+    io:format("rebar compilation - please wait~n"),
+    io:format("~s~n", [os:cmd("./rebar get-deps compile")]).
