@@ -49,6 +49,17 @@
 start(_StartType, _StartArgs) ->
     %% read mapp conf
     {ok, MConf} = minino_config:read_file(), 
+    
+    %% change node name
+    Node = proplists:get_value(node_name, MConf, 'minino'),
+    net_kernel:start([Node, shortnames]),
+    error_logger:info_msg("Node: ~p~n", [node()]),
+
+    %% set cookie
+    Cookie = proplists:get_value(cookie, MConf, 'minino_default_cookie'),
+    erlang:set_cookie(node(), Cookie),
+    error_logger:info_msg("cookie: ~p~n", [erlang:get_cookie()]),
+
     Port = proplists:get_value(port, MConf, 8080),
     ConfMediaUrl = proplists:get_value(media_url, MConf, ["media"]),
     MediaUrl = "/" ++ string:join(ConfMediaUrl, "/") ++ "/[...]",

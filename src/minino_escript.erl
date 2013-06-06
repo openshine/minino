@@ -44,6 +44,7 @@
 	 {"create-app", "create a new app; create-app id=myapp", always},
 	 {"runserver", "runserver [port]", appcreated},
 	 {"debug", "debug [port]", appcreated},
+	 {"stop", "stop minino", always},
 	 {"compile", "compile", appcreated}
 
 	]).
@@ -67,7 +68,6 @@ main(Args) ->
     end.
 
 
-
 is_command([],_) ->
     false;
 is_command([Command|_], {AvailableCommnads, _}) ->
@@ -86,7 +86,7 @@ get_status()->
 	[] -> noapp;
 	_ -> appcreated
     end.
- 
+
 get_commands(Status)->
     Acc0 = {[],[]},
     lists:foldr(
@@ -133,6 +133,8 @@ command(CommandArgs)->
 	    runserver(PortList, nodebug);
      	["debug" | PortList] ->
 	    runserver(PortList, debug);
+	["stop"] ->
+	    stop_minino();
 	["compile"|_Args] ->
 	    compile_files(),
 	    io:format("~n");
@@ -149,8 +151,12 @@ runserver(PortList, Mode) ->
     end,
     compile_files(),
     ok = minino:start(),
+    erlang:register(?MODULE, self()),
     case Mode of 
-	nodebug -> timer:sleep(infinity);
+ 	nodebug ->
+	    receive 
+		stop -> ok
+	    end;
 	debug -> debug_mode()
     end.
 
@@ -271,7 +277,6 @@ compile_files()->
 
 debug_mode() ->
     spawn(fun user_drv:start/0),
-    erlang:register(minino_shell, self()),
     receive
 	stop -> ignore
     end.
@@ -279,3 +284,19 @@ debug_mode() ->
 rebar_compilation() ->
     io:format("rebar compilation - please wait~n"),
     io:format("~s~n", [os:cmd("./rebar get-deps compile")]).
+
+
+stop_minino()->
+    net_kernel:start(['escript', shortnames]),
+    {ok, Settings} = minino_api:read_settings_file(),
+    Cookie = proplists:get_value(cookie, Settings, 'minino_default_cookie'),
+    erlang:set_cookie(node(), Cookie),
+    MininoNode = proplists:get_value(node_name, Settings),
+    CompleteNode = list_to_atom(
+		     atom_to_list(MininoNode) ++ 
+			 "@" ++ 
+			 net_adm:localhost()),
+    rpc:call(CompleteNode, minino, stop, []),
+    ok.
+
+

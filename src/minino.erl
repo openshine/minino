@@ -41,7 +41,8 @@
 %%API
 -export([main/1,
 	 start/0,
-	 stop/0]).
+	 stop/0
+	]).
 
 %% escript
 main(Args) ->
@@ -59,11 +60,10 @@ stop()->
     application:stop(cowboy),
     application:stop(minino),
     try 
-	minino_shell ! stop
+	minino_escript ! stop
     catch _:_ -> 
 	    ignore
     end.
-
 
 ensure_start(App) ->
     case  application:start(App) of
