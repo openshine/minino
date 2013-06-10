@@ -281,9 +281,9 @@ debug_mode() ->
 	stop -> ignore
     end.
 
-rebar_compilation() ->
-    io:format("rebar compilation - please wait~n"),
-    io:format("~s~n", [os:cmd("./rebar get-deps compile")]).
+%% rebar_compilation() ->
+%%     io:format("rebar compilation - please wait~n"),
+%%     io:format("~s~n", [os:cmd("./rebar get-deps compile")]).
 
 
 stop_minino()->
@@ -300,3 +300,31 @@ stop_minino()->
     ok.
 
 
+
+
+
+rebar_compilation() ->
+    Pid = self(),
+    spawn(fun() -> rebar_comp_process(Pid) end),
+    receive
+	finished -> ok
+    after 5*60*1000 ->
+	    timeout
+    end.
+
+rebar_comp_process(Pid)->
+    Port = open_port({spawn,"./rebar get-deps compile"},
+		     [binary,
+		      {line, 255}, 
+		      exit_status]),
+    rebar_comp_loop(Port, Pid).
+
+
+rebar_comp_loop(Port, Pid) ->
+    receive
+	{Port,{data, {eol, Bin}}} ->
+	    io:format("~s~n",[erlang:binary_to_list(Bin)]),
+	    rebar_comp_loop(Port, Pid);
+	{Port,{exit_status,0}} ->
+	    Pid ! finished
+    end.
