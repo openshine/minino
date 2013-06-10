@@ -85,8 +85,8 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, MConf, AppTerm, From, Ref]}, State) ->
-    MReq2 = MReq#mreq{build_url_fun=BuildUrlFun, mconf=MConf, from=From},
+handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, AppTerm, From, Ref]}, State) ->
+    MReq2 = MReq#mreq{build_url_fun=BuildUrlFun, from=From},
     Path = minino_api:path(MReq2),
     Response =
      	case MatchFun(Path) of

@@ -166,7 +166,6 @@ handle_cast({dispatch, MReq, From, Ref}, State) ->
     	      State#state.mapp, 
     	      State#state.match_fun,  
     	      State#state.build_url_fun,
-    	      State#state.mconf, 
 	      State#state.app_term,
     	      From, 
 	      Ref],

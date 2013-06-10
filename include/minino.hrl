@@ -7,8 +7,6 @@
 
 -record(mreq,  {creq,
 		build_url_fun,
-		mconf,
-		file,
 		session,
 		from}).
 
