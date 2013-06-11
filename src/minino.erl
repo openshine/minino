@@ -46,6 +46,8 @@
 
 %% escript
 main(Args) ->
+    %% ensure epmd is running
+    [] = os:cmd("epmd -daemon"),
     minino_escript:main(Args).
 
 start()->

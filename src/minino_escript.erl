@@ -54,6 +54,7 @@
 
 
 main(Args) ->
+
     Status = get_status(),
     Commands = get_commands(Status),
     {ok, {[], CommandArgs}} = getopt:parse([], Args),
@@ -280,11 +281,6 @@ debug_mode() ->
     receive
 	stop -> ignore
     end.
-
-%% rebar_compilation() ->
-%%     io:format("rebar compilation - please wait~n"),
-%%     io:format("~s~n", [os:cmd("./rebar get-deps compile")]).
-
 
 stop_minino()->
     net_kernel:start(['escript', shortnames]),
