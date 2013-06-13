@@ -49,7 +49,7 @@
 start(_StartType, _StartArgs) ->
     %% read mapp conf
     {ok, MConf} = minino_config:read_file(), 
-    
+
     %% change node name
     Node = proplists:get_value(node_name, MConf, 'minino_app'),
     net_kernel:stop(),

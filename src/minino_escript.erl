@@ -163,7 +163,7 @@ runserver(PortList, Mode, RemoteNode) ->
     case PortList of
 	[PStr] when is_list(PStr) ->	
 	    {Port, _} = string:to_integer(PStr),
-	    application:set_env(minino, mport, Port);
+	    application:set_env(minino, port, Port);
 	_ -> ignore
     end,
     compile_files(),
