@@ -52,6 +52,7 @@ start(_StartType, _StartArgs) ->
     
     %% change node name
     Node = proplists:get_value(node_name, MConf, 'minino_app'),
+    net_kernel:stop(),
     net_kernel:start([Node, shortnames]),
     error_logger:info_msg("Node: ~p~n", [node()]),
 

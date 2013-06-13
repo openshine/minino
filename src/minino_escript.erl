@@ -131,9 +131,9 @@ command(CommandArgs)->
 	["create-app",[$i,$d,$=|AppName]] ->
 	    create_app(AppName);
 	["runserver" | PortList] ->
-	    runserver(PortList, nodebug);
+	    runserver(PortList, nodebug, undefined);
      	["debug" | PortList] ->
-	    runserver(PortList, debug);
+	    debug(PortList);
 	["stop"] ->
 	    stop_minino();
 	["compile"|_Args] ->
@@ -143,7 +143,23 @@ command(CommandArgs)->
     end.
 
 
-runserver(PortList, Mode) ->
+
+debug(PortList) ->
+    {ok, Settings} = minino_api:read_settings_file(),
+    set_node_name('escript', Settings),
+    MininoNode = get_minino_node(Settings),
+    io:format("~p ping -> ~p~n", [MininoNode, net_adm:ping(MininoNode)]),
+    case net_adm:ping(MininoNode) of
+	pang ->
+	    runserver(PortList, debug, undefined);
+	pong ->
+	    error_logger:info_msg("Minino was already running.~n" ++
+				      "This a remote shell~n"),
+	    debug_shell(MininoNode)
+    end.
+    
+
+runserver(PortList, Mode, RemoteNode) ->
     case PortList of
 	[PStr] when is_list(PStr) ->	
 	    {Port, _} = string:to_integer(PStr),
@@ -158,10 +174,23 @@ runserver(PortList, Mode) ->
 	    receive 
 		stop -> ok
 	    end;
-	debug -> debug_mode()
+	debug -> 
+	    debug_shell(RemoteNode)
     end.
 
 
+debug_shell(undefined) ->
+    spawn(fun()-> user_drv:start() end),
+    receive
+	stop -> ignore
+    end;
+debug_shell(Node) ->
+    Pname = 'tty_sl -c -e',
+    Shell = {Node,shell,start,[]},
+    spawn(fun()-> user_drv:start(Pname, Shell) end),
+    receive
+	stop -> ignore
+    end.
 
 create_app(AppName) ->
     io:format("~s app created.~n", [AppName]),
@@ -276,30 +305,28 @@ compile_files()->
 	      Files)
     end.
 
-debug_mode() ->
-    spawn(fun user_drv:start/0),
-    receive
-	stop -> ignore
-    end.
-
 stop_minino()->
-    net_kernel:start(['escript', shortnames]),
     {ok, Settings} = minino_api:read_settings_file(),
-    Cookie = proplists:get_value(cookie, Settings, 'minino_default_cookie'),
-    Node = node(),
-    erlang:set_cookie(Node, Cookie),
-    MininoNode = proplists:get_value(node_name, Settings),
-    [_Name, Domain] = string:tokens(atom_to_list(Node), "@"),
-    CompleteNode = 
-       	list_to_atom(
-       	  atom_to_list(MininoNode) ++ 
-	      "@" ++ 
-	      Domain),
-    io:format("stop: ~p~n", [CompleteNode]),
-    rpc:call(CompleteNode, minino, stop, []),
+    set_node_name('escript', Settings),
+    MininoNode = get_minino_node(Settings),
+    io:format("stop: ~p~n", [MininoNode]),
+    rpc:call(MininoNode, minino, stop, []),
     ok.
 
 
+set_node_name(Name, Settings)->
+    net_kernel:start([Name, shortnames]),
+    Cookie = proplists:get_value(cookie, Settings, 'minino_default_cookie'),
+    erlang:set_cookie(node(), Cookie).
+
+get_minino_node(Settings) ->
+    Node = node(),
+    MininoNode = proplists:get_value(node_name, Settings),
+    [_Name, Domain] = string:tokens(atom_to_list(Node), "@"),
+    list_to_atom(
+      atom_to_list(MininoNode) ++ 
+	  "@" ++ 
+	  Domain).
 
 
 
