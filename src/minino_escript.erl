@@ -286,12 +286,16 @@ stop_minino()->
     net_kernel:start(['escript', shortnames]),
     {ok, Settings} = minino_api:read_settings_file(),
     Cookie = proplists:get_value(cookie, Settings, 'minino_default_cookie'),
-    erlang:set_cookie(node(), Cookie),
+    Node = node(),
+    erlang:set_cookie(Node, Cookie),
     MininoNode = proplists:get_value(node_name, Settings),
-    CompleteNode = list_to_atom(
-		     atom_to_list(MininoNode) ++ 
-			 "@" ++ 
-			 net_adm:localhost()),
+    [_Name, Domain] = string:tokens(atom_to_list(Node), "@"),
+    CompleteNode = 
+       	list_to_atom(
+       	  atom_to_list(MininoNode) ++ 
+	      "@" ++ 
+	      Domain),
+    io:format("stop: ~p~n", [CompleteNode]),
     rpc:call(CompleteNode, minino, stop, []),
     ok.
 
