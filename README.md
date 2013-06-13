@@ -41,7 +41,6 @@ $ mkdir kitty
 $ cd kitty
 $ cp /path/to/minino/bin/minino .
 $ ./minino create-app id=kitty
-$ ./rebar get-deps compile
 ```
 ##  Run Minino Server <a name="runserver"></a>
 
