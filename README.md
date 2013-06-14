@@ -22,7 +22,11 @@ This is an [Openshine](http://www.openshine.com) project developed by:
 
 ##  Get Minino  <a name="getminino"></a>
 ### Download <a name="download"></a>
-Not available yet.
+Get the binary.
+```sh
+$ wget http://github.com/openshine/minino/wiki/minino
+$ chmod 744 minino 
+```
 
 ### Build
 
@@ -36,12 +40,13 @@ $ make
 
 ##  Create a Minino Application <a name="createapp"></a>
 
+Create an application directory and copy the minino binary there.
+ 
 ```sh
 $ mkdir kitty
 $ cd kitty
 $ cp /path/to/minino/bin/minino .
 $ ./minino create-app id=kitty
-$ ./rebar get-deps compile
 ```
 ##  Run Minino Server <a name="runserver"></a>
 
@@ -54,7 +59,7 @@ Check minino running at [http://localhost:8000](http://localhost:8000)
 
 
 ##  Examples <a name="examples"></a>
-Check the examples [examples](./examples)
+Check some code [examples](./examples)
 
 
 ##  Documentation <a name="doc"></a>

@@ -42,7 +42,11 @@
 	[
 	 %%{Name::string(), Help()::string(), Available:: always | appcreated
 	 {"create-app", "create a new app; create-app id=myapp", always},
-	 {"runserver", "runserver [port]", appcreated}
+	 {"runserver", "runserver [port]", appcreated},
+	 {"debug", "debug [port]", appcreated},
+	 {"stop", "stop minino", always},
+	 {"compile", "compile", appcreated}
+
 	]).
 
 %% API
@@ -50,6 +54,7 @@
 
 
 main(Args) ->
+
     Status = get_status(),
     Commands = get_commands(Status),
     {ok, {[], CommandArgs}} = getopt:parse([], Args),
@@ -62,7 +67,6 @@ main(Args) ->
 	false ->
 	    usage(Commands)
     end.
-
 
 
 is_command([],_) ->
@@ -83,7 +87,7 @@ get_status()->
 	[] -> noapp;
 	_ -> appcreated
     end.
- 
+
 get_commands(Status)->
     Acc0 = {[],[]},
     lists:foldr(
@@ -127,41 +131,69 @@ command(CommandArgs)->
 	["create-app",[$i,$d,$=|AppName]] ->
 	    create_app(AppName);
 	["runserver" | PortList] ->
-	    case PortList of
-	    	[PStr] when is_list(PStr) ->	
-		    {Port, _} = string:to_integer(PStr),
-	    	    application:set_env(minino, mport, Port);
-	    	_ -> ignore
-	    end,
-	    ok = minino:start(),
-	    timer:sleep(infinity);
+	    runserver(PortList, nodebug, undefined);
+     	["debug" | PortList] ->
+	    debug(PortList);
+	["stop"] ->
+	    stop_minino();
+	["compile"|_Args] ->
+	    compile_files(),
+	    io:format("~n");
 	_ -> notavailable
     end.
 
 
 
+debug(PortList) ->
+    {ok, Settings} = minino_api:read_settings_file(),
+    set_node_name('escript', Settings),
+    MininoNode = get_minino_node(Settings),
+    io:format("~p ping -> ~p~n", [MininoNode, net_adm:ping(MininoNode)]),
+    case net_adm:ping(MininoNode) of
+	pang ->
+	    runserver(PortList, debug, undefined);
+	pong ->
+	    error_logger:info_msg("Minino was already running.~n" ++
+				      "This a remote shell~n"),
+	    debug_shell(MininoNode)
+    end.
+    
+
+runserver(PortList, Mode, RemoteNode) ->
+    case PortList of
+	[PStr] when is_list(PStr) ->	
+	    {Port, _} = string:to_integer(PStr),
+	    application:set_env(minino, port, Port);
+	_ -> ignore
+    end,
+    compile_files(),
+    ok = minino:start(),
+    erlang:register(?MODULE, self()),
+    case Mode of 
+ 	nodebug ->
+	    receive 
+		stop -> ok
+	    end;
+	debug -> 
+	    debug_shell(RemoteNode)
+    end.
+
+
+debug_shell(undefined) ->
+    spawn(fun()-> user_drv:start() end),
+    receive
+	stop -> ignore
+    end;
+debug_shell(Node) ->
+    Pname = 'tty_sl -c -e',
+    Shell = {Node,shell,start,[]},
+    spawn(fun()-> user_drv:start(Pname, Shell) end),
+    receive
+	stop -> ignore
+    end.
 
 create_app(AppName) ->
     io:format("~s app created.~n", [AppName]),
-
-    %% copy rebar bin
-    case filelib:is_regular("rebar") of
-    	true -> 
-    	    ignore;
-    	false ->
-    	    RebarBin = get_bin("rebar"),
-    	    file:write_file("rebar", RebarBin),
-    	    os:cmd("chmod 0755 rebar")
-    end,
-
-    %% create rebar.config
-    case filelib:is_regular("rebar.config") of
-    	true -> 
-	    ignore;
-    	false ->
-	    RConfBin = get_bin("template.rebar.config"),
-	    file:write_file("rebar.config", RConfBin)
-    end,
 
     %%create app
     AppFileName = filename:join(["src", AppName ++ ".erl"]),
@@ -248,3 +280,78 @@ create_random_string(Length, Counter, Acc)->
     Char = random:uniform(LastChar - FirstChar + 1) + FirstChar - 1,
     create_random_string(Length, Counter + 1, [Char|Acc]).
     
+
+
+compile_files()->
+    case filelib:is_regular("rebar") of
+	true ->
+	    rebar_compilation();
+	false ->
+	    Files = filelib:wildcard("src/*.erl"),
+	    ok = filelib:ensure_dir("ebin/dummy.file"),
+	    Opts = [verbose,
+		    report_errors,
+		    report_warnings,
+		    {i, ["include"]},
+		    {outdir, "ebin"}
+		    
+		   ],
+	    lists:foreach(
+	      fun(Path) ->
+		      Result = compile:file(Path, Opts),
+		      io:format("compile ~p -> ~p", [Path, Result]),
+		      {ok, _Mod} = Result
+	      end,
+	      Files)
+    end.
+
+stop_minino()->
+    {ok, Settings} = minino_api:read_settings_file(),
+    set_node_name('escript', Settings),
+    MininoNode = get_minino_node(Settings),
+    io:format("stop: ~p~n", [MininoNode]),
+    rpc:call(MininoNode, minino, stop, []),
+    ok.
+
+
+set_node_name(Name, Settings)->
+    net_kernel:start([Name, shortnames]),
+    Cookie = proplists:get_value(cookie, Settings, 'minino_default_cookie'),
+    erlang:set_cookie(node(), Cookie).
+
+get_minino_node(Settings) ->
+    Node = node(),
+    MininoNode = proplists:get_value(node_name, Settings),
+    [_Name, Domain] = string:tokens(atom_to_list(Node), "@"),
+    list_to_atom(
+      atom_to_list(MininoNode) ++ 
+	  "@" ++ 
+	  Domain).
+
+
+
+rebar_compilation() ->
+    Pid = self(),
+    spawn(fun() -> rebar_comp_process(Pid) end),
+    receive
+	finished -> ok
+    after 5*60*1000 ->
+	    timeout
+    end.
+
+rebar_comp_process(Pid)->
+    Port = open_port({spawn,"./rebar get-deps compile"},
+		     [binary,
+		      {line, 255}, 
+		      exit_status]),
+    rebar_comp_loop(Port, Pid).
+
+
+rebar_comp_loop(Port, Pid) ->
+    receive
+	{Port,{data, {eol, Bin}}} ->
+	    io:format("~s~n",[erlang:binary_to_list(Bin)]),
+	    rebar_comp_loop(Port, Pid);
+	{Port,{exit_status,0}} ->
+	    Pid ! finished
+    end.
