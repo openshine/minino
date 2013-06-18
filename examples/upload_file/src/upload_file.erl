@@ -20,8 +20,8 @@ init(MConf) ->
     {ok, #term{file_name=FileName}}.
 
 dispatch_rules() ->
-    [%% {Id::atom(), Path::[string()|atom()], view::atom()}
-     {upload_page, ["upload"], upload_view}
+    [%% {Id::atom(), RegexUrlPath::string(), view::atom()}
+        {home_page, "^/upload$", upload_view}
     ].
 
 

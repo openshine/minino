@@ -40,7 +40,7 @@
 -export([response/2,
 	 path/1,
 	 render_template/2,
-	 build_url/3,
+	 build_url/2,
 	 get_cookies/1,
 	 get_cookie/2,
 	 set_cookie/3,
@@ -87,12 +87,10 @@ render_template(Template, Args) ->
 %% @doc build url.
 %% <p>This function creates an url from a view id.</p>
 %% @end
--spec build_url(Id::atom(), Args::[{Key::atom(), Value::string()}], MReq::minino_req()) -> 
+-spec build_url(Id::atom(), Args::[string()]) -> 
 		       {ok, string()} | {error, term()}.
-build_url(Id, Args, MReq) ->
-    F = MReq#mreq.build_url_fun,
-    F(Id, Args).
-
+build_url(Id, Args) ->
+  minino_dispatcher:build_url(Id, Args).
 
 
 %% Sessions

@@ -85,28 +85,29 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({work, [MReq, MApp, MatchFun, BuildUrlFun, AppTerm, From, Ref]}, State) ->
-    MReq2 = MReq#mreq{build_url_fun=BuildUrlFun, from=From},
-    Path = minino_api:path(MReq2),
+handle_cast({work, [MReq, View, Args, MApp, AppTerm, Ref]}, State) ->
+    error_logger:info_msg("view: ~p~n", [View]),
     Response =
-     	case MatchFun(Path) of
-    	    undefined ->
-    		minino_api:response({error, 404}, MReq2);
-    	    {View, Args} ->
-		try
-		    MApp:View(MReq2, Args, AppTerm)
-		catch Class:Exception ->
-			ErrorMsg =
-			    "error in ~p:~p ~n" ++
-			    "~p:~p~n" ++
-			    "view: ~p~n" ++ 
-			    "args: ~p~n" ++
-			    "minino request: ~p~n",
-			error_logger:error_msg(ErrorMsg, [MApp, View, Class, Exception, View, Args, MReq2]),
-			minino_api:response({error, 500}, MReq2)
-		end
-	end,
-    minino_dispatcher:response(From, Response, Ref),
+    	try
+    	    MApp:View(MReq, Args, AppTerm)
+    	catch Class:Exception ->
+    		ErrorMsg =
+    		    "error in ~p:~p ~n" ++
+    		    "~p:~p~n" ++
+    		    "view: ~p~n" ++ 
+    		    "args: ~p~n" ++
+    		    "minino request: ~p~n",
+    		error_logger:error_msg(ErrorMsg, 
+    				       [MApp, 
+    					View, 
+    					Class, 
+    					Exception, 
+    					View, 
+    					Args,
+    					MReq]),
+    		minino_api:response({error, 500}, MReq)
+    	end,
+    minino_dispatcher:response(MReq#mreq.from, Response, Ref),
     {noreply, State}.
 
 handle_info(_Info, State) ->

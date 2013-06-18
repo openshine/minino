@@ -38,13 +38,17 @@
 
 -behaviour(gen_server).
 
+-include("include/minino.hrl").
+
 %% API
 -export([start_link/1,
 	 dispatch/1,
 	 response/3,
 	 update_rules/0,
-	 create_match_fun/1,
-	 create_build_url_fun/1]).
+	 match_url/2,
+	 build_url/2,
+	 build_url/3
+	]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -54,9 +58,8 @@
 
 -record(state, {mapp,
 		mconf,
-		match_fun,
-		build_url_fun,
-		app_term
+		app_term,
+		dispatch_rules
 	       }).
 
 
@@ -86,8 +89,11 @@ response(To, MResponse, Ref) ->
 
 update_rules() ->
     gen_server:call(?SERVER, update_rules).
-    
 
+
+build_url(Id, Args) ->
+    gen_server:call(?SERVER, {build_url, Id, Args}).
+			    
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -105,17 +111,12 @@ update_rules() ->
 %%--------------------------------------------------------------------
 init([MConf]) ->
     MApp = proplists:get_value(app_mod, MConf),
-    MatchFun = create_match_fun(MApp:dispatch_rules()),
-    BuildUrlFun = create_build_url_fun(MApp:dispatch_rules()),
     {ok, AppTerm} =  MApp:init(MConf),
     {ok, #state{mapp=MApp,
-		mconf=MConf,
-		build_url_fun=BuildUrlFun,
-		match_fun=MatchFun,
-		app_term=AppTerm
-	       }}.
-
-
+    		mconf=MConf,
+    		app_term=AppTerm,
+    		dispatch_rules=MApp:dispatch_rules()
+    	       }}.
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -132,11 +133,15 @@ init([MConf]) ->
 %%--------------------------------------------------------------------
 handle_call(update_rules, _From, State) ->
     MApp =State#state.mapp,
-    Rules = MApp:dispatch_rules(),
-    MatchFun = create_match_fun(Rules),
     {ok, AppTerm} =  MApp:init(State#state.mconf),
-    {reply, ok, State#state{match_fun=MatchFun,
-			   app_term=AppTerm}};
+    {reply, ok, State#state{
+			    app_term=AppTerm,
+			    dispatch_rules=MApp:dispatch_rules()
+			   }};
+
+handle_call({build_url, Id, Args}, _From, State) ->
+    Reply = build_url(Id, Args, State#state.dispatch_rules),
+    {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -154,22 +159,31 @@ handle_call(_Request, _From, State) ->
 %%--------------------------------------------------------------------
 
 handle_cast({dispatch, MReq, From, Ref}, State) ->
-    %% create worker process
-    WSpec = {make_ref(), 
-    	     {minino_req_worker, start_link, []}, 
-    	     permanent, 
-	     5000, 
-	     worker, 
-	     dynamic},
-    {ok, Pid} = supervisor:start_child(minino_dispatcher_sup, WSpec),
-    Params = [MReq, 
-    	      State#state.mapp, 
-    	      State#state.match_fun,  
-    	      State#state.build_url_fun,
-	      State#state.app_term,
-    	      From, 
-	      Ref],
-    gen_server:cast(Pid, {work, Params}),
+    Path = minino_api:path(MReq),
+    MReq1 = MReq#mreq{from=From},
+    case  match_url(Path, State#state.dispatch_rules) of
+	nomatch ->
+	    Response = minino_api:response({error, 404}, MReq1),
+	    minino_dispatcher:response(From, Response, Ref);
+	{match, _Id, View, Args}  ->
+
+	    %% create worker process
+	    WSpec = {make_ref(), 
+	    	     {minino_req_worker, start_link, []}, 
+	    	     permanent, 
+	    	     5000, 
+	    	     worker, 
+	    	     dynamic},
+	    {ok, Pid} = supervisor:start_child(minino_dispatcher_sup, WSpec),
+	    Params = [MReq1, 
+		      View,
+		      Args,
+		      State#state.mapp, 
+		      State#state.app_term,
+		      Ref],
+		gen_server:cast(Pid, {work, Params})
+
+    end,
     {noreply, State};
 
 handle_cast(_Msg, State) ->
@@ -217,168 +231,65 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-
-%% @spec create_match_fun(DispRules::[rule()]) -> F::fun()
-%% DispRules = [rule()]
-%% rule() =  {Id::atom(), Path::[string()|atom()], View::atom()}
-%% 
-%% @end
-create_match_fun(DispRules)->
-    ParsedRules = [parse_rule(Rule) || Rule <- DispRules],
-    Clauses =
-	lists:foldl(
-	  fun({{M, R, _C}, View}, Acc) ->
-		  Clause = lists:flatten(io_lib:format("(~s) -> {~p, ~s}", [M, View, R])), 
-		  Acc ++ Clause ++ ";\n"
-	  end,
-	  [],
-	  ParsedRules),
-    FStr =  "fun"  ++ Clauses ++ "(_Esle) -> undefined \nend.",
-    {ok,Scanned,_} = erl_scan:string(FStr),
-    {ok,Parsed} = erl_parse:parse_exprs(Scanned),
-    {value, F, _} = erl_eval:exprs(Parsed,[]),
-    F.		  
-
-parse_rule({_Id, [], View}) ->
-    {{"[]","[]", 0}, View};
-
-parse_rule({_Id, RulePath, View}) ->
-    {create_match_str(RulePath), View}.
-
-	    
-create_match_str(RulePath) ->
-     create_match_str(RulePath, []).
-
-create_match_str([], Acc) ->
-    close_match(Acc);
-
-create_match_str(['*'|_], Acc) ->
-    append_match({tail}, Acc);
-
-create_match_str([Var|R], Acc) when is_atom(Var) ->
-    create_match_str(R, append_match(Var, Acc));
-
-create_match_str([String|R], Acc) ->
-    create_match_str(R, append_match(String, Acc)).
-
-
-append_match(E, [])->
-    Acc = {"", "", 0},
-    append_match(E, Acc);
     
-append_match({tail}, {M, R, C}) ->
-    case M of
-	"" -> {"V", "V", 1};
-	M -> 
-	    V = lists:flatten(io_lib:format("V~p", [C])),
-	    M1 = M ++ " | " ++ V,
-	    R1 = 
-		case R of
-		    "" -> V;
-		    R -> R ++ ", " ++ V
-		end,
-	    close_match({M1, R1, C+1})
-    end;
+match_url(Url, DispatchRules) ->
+    match_url_loop(DispatchRules, Url).
 
-append_match(Var, {M, R, C}) when is_atom(Var) ->
-    V = lists:flatten(io_lib:format("V~p", [C])),
-    TupleStr = 
-	"{" ++ 
-	erlang:atom_to_list(Var) ++ 
-	", " ++
-	V ++ 
-	"}",
-    case M of
-	"" -> {V, V, C+1};
-	M -> 
-	    M1 = M ++ ", " ++ V,
-	    R1 = case R of
-		     "" -> TupleStr; 
-		     R -> R ++ ", " ++ TupleStr
-		 end,
-	    {M1, R1, C+1}
-    end;
+match_url_loop([], _Url)->
+    nomatch;
 
-append_match(Str, {M, R, C}) when is_list(Str) ->
-    case M of
-	"" -> {escp(Str), R, C};
-	M ->
-	    M1 = M ++ ", " ++ escp(Str),
-	    {M1, R, C}
+match_url_loop([{Id, RegexUrl, View}=_Rule|Rest], Url)->
+    case match_sinlge_url(Url, RegexUrl) of
+	{match, Args} ->
+	    {match, Id, View, Args};
+	nomatch ->
+	    match_url_loop(Rest, Url)
     end.
-    
-close_match({M, R, C})->
-    M1 = case M of
-	     [] -> "[]";
-	     M -> "[" ++ M ++ "]"
-	 end,
-    R1 = case R of
-	     [] -> "[]";
-	     R -> "[" ++ R ++ "]"
-	 end,
-    
-    {M1, R1, C}.
 
-escp(S) -> "\"" ++ S ++ "\"".
     
+match_sinlge_url(Url, RegexUrl) ->
+    re:run(Url, RegexUrl, [{capture, all_but_first, list}]).
 
-
-%% @doc create build url fun
-%% -spec create_build_url_fun(Rules::[rule()]) -> fun()
-create_build_url_fun(DispRules) ->
-    fun(Id, Args) ->
-	    build_url(Id, Args, DispRules)
+build_url(Id, Args, DispatchRules) ->
+    case lists:keyfind(Id, 1, DispatchRules) of
+	false -> {error, "id not found"};
+	{Id, RegexUrl, _View} ->
+	    inverse_url(RegexUrl, Args)
     end.
 
 
+inverse_url(RegexUrl, Args)->
+    List = string:tokens(RegexUrl, "()"),
+    inverse_url_loop(List, Args, []). 
 
+inverse_url_loop([], _Args, Acc) ->
+    inverse_url_end(lists:reverse(Acc));
+inverse_url_loop(Rest, [], Acc) ->
+    inverse_url_end(lists:reverse(Acc) ++ Rest);
 
-%% @doc build url
-%% -spec create_build_url_fun(Id::atom(), Args::[{Key::atom(), Val::string()}], [rule()]) -> 
-%%       			  {ok, Url::string()} | {error, term()}
-build_url(Id, Args, DispRules) ->
-    Checked = lists:all(
-		fun({Key, Value}) when is_atom(Key), is_list(Value)->
-			true;
-		   (_)-> false
-		end,
-		Args),
-    case Checked of
-	true ->
-	    case  get_path_loop(DispRules, Id) of
-		undefined -> undefined;
-		Path ->
-		    url_append_items(Path, Args, [])
-	    end;
-	false ->
-	    {error, "Args. Type not vaild"}
+inverse_url_loop([E|Rest], [Arg|RestArgs]=AllArgs, Acc) ->
+    case re:run(Arg, E, [{capture, 
+			  all_but_first, 
+			  list}]) of
+	nomatch ->
+	    inverse_url_loop(Rest, AllArgs, [E|Acc]);
+	{match, _} ->
+	    inverse_url_loop(Rest, RestArgs, [Arg|Acc])
+
     end.
-	
-
-get_path_loop([], _Id)->
-    undefined; 
-get_path_loop([{Id, Path,_}|_], Id) ->
-    Path;
-get_path_loop([_|Tail], Id) ->
-    get_path_loop(Tail, Id).
+    
 
 
-url_append_items([], _args, Acc) ->
-    "/" ++ string:join(lists:reverse(Acc), "/");
-
-url_append_items([E|T], Args, Acc) ->
-    Val =
-	case E of
-	    E when is_atom(E) ->
-		case proplists:get_value(E, Args) of
-		    V when V /= undefined ->
-			V
-		end;
-	    E when is_list(E)->
-		E
+inverse_url_end(List) ->
+    L = lists:flatten(List),
+    L1 =
+	case L of
+	    [$^|R] -> R;	 
+	    R -> R
 	end,
-    url_append_items(T, Args, [Val|Acc]).
+    case lists:reverse(L1) of
+	[$$|R1] ->  lists:reverse(R1);	 
+	_ -> L1
+    end.
 
-    
-	    
-		  
+

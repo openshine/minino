@@ -54,7 +54,7 @@ response(Msg, MReq) ->
 
 path(MReq) ->
     {BinPath, _} = cowboy_req:path(MReq#mreq.creq),
-    string:tokens(binary_to_list(BinPath), "/").
+    binary_to_list(BinPath).
 
 create_msg_error(404) ->
     <<"Error 404: Not found.">>;

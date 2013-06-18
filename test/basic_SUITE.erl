@@ -5,9 +5,9 @@
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
--export([simple_tests/1, 
+-export([
+	 url_tests/1,
 	 escript_tests/1,
-	 kitty_tests/1,
 	 hello_world_example_tests/1,
 	 upload_file_example_tests/1,
 	 miscellaneous_example_tests/1,
@@ -18,6 +18,7 @@
 	]).
 
 all() -> [
+	  url_tests,
 	  cookies_example_tests,
 	  templates_example_tests,
 	  statics_example_tests,
@@ -25,9 +26,7 @@ all() -> [
 	  miscellaneous_example_tests,
 	  upload_file_example_tests,
 	  hello_world_example_tests,
-	  kitty_tests,
-	  escript_tests, 
-	  simple_tests
+	  escript_tests
 	 ].
 
 init_per_testcase(cookies_example_tests, Config) ->
@@ -179,31 +178,8 @@ init_per_testcase(hello_world_example_tests, Config) ->
 
 
 
-init_per_testcase(kitty_tests, Config) ->
-    %%compile app
-    DataDir = proplists:get_value(data_dir, Config),
-    AppSource = filename:join([DataDir, "kitty.erl"]),
-    {ok, kitty} = compile:file(AppSource),
-
-    %% set settings.cfg file
-    Settings = filename:join([DataDir, "settings.cfg"]),
-    application:set_env(minino, settings_file, Settings),      
-
-    %% set templates dir
-    Templates = filename:join([DataDir, "templates"]),
-    application:set_env(minino, templates_dir, Templates),      
-
-    %% start inets
-    application:start(inets),
-
-    %%start minino
-    minino:start(),
-    Config;  
-
-
-init_per_testcase(simple_tests, Config) ->
+init_per_testcase(url_tests, Config) ->
     Config;   
-
 
 init_per_testcase(escript_tests, Config) ->
     application:start(inets),
@@ -362,25 +338,10 @@ hello_world_example_tests(_Config)->
     Url = "http://127.0.0.1:8000",
     {200, _Body, _} = request(Url),
     error_logger:info_msg("code 200 -> ok~n"),
-    ok.
-
-
-
-%%======================================================
-%% kitty_tests
-%%======================================================
-
-kitty_tests(_Config)->
-    kitty = kitty:check_module(),
-    Url = "http://127.0.0.1:8000",
-    error_logger:info_msg("check http codes~n"),
-    {200, _Body, _} = request(Url),
-    error_logger:info_msg("code 200 -> ok~n"),
     {404, _Body1, _} = request(Url ++ "/undefined"),
     error_logger:info_msg("code 404 -> ok~n"),
-    {500, _Body2, _} = request(Url ++ "/error500"),
-    error_logger:info_msg("code 500 -> ok~n"),
     ok.
+
 %%======================================================
 %% escript_tests
 %%======================================================
@@ -391,6 +352,9 @@ escript_tests(_Config) ->
     error_logger:info_msg("test ping: ~p -> ok", [Url]),
     Cookie = check_cookies(Url),
     error_logger:info_msg("check cookies: ~p~n", [Cookie]),
+    %% build urls
+    "/home" = minino_api:build_url(home_page2, []),
+    "/test/testword"= minino_api:build_url(test_page, ["testword"]),
     ok.
 
 check_cookies(Url) ->
@@ -405,72 +369,103 @@ check_cookies(Url) ->
     Cookie.
 
 
-%%======================================================
-%% Simple Tests
-%%======================================================
 
-simple_tests(_Config) ->
-    check_dispatch_rules(),
-    check_build_urls(),
+%%======================================================
+%% Url Tests
+%%======================================================
+url_tests(_Config)->
+    Rules = get_dispatch_rules(),
+
+    %% match urls
+
+    {match, 
+     home_page,
+     home_view,
+     []} = minino_dispatcher:match_url("/", Rules),
+
+    {match, 
+     home_page2,
+     home_view,
+     []} = minino_dispatcher:match_url("/home/", Rules),
+
+    {match,
+     test_page,
+     test_view,
+     ["arg1"]} = minino_dispatcher:match_url("/test/arg1/", Rules),
+
+    {match, 
+     articles_page,
+     articles_view,
+     ["2013"]} = minino_dispatcher:match_url("/articles/2013/", Rules),
+
+    {match, 
+     article_page,
+     article_view,
+     ["2013", "05"]} = minino_dispatcher:match_url("/articles/2013/05/", Rules),
+
+    {match,
+     get_page,
+     get_view,
+     ["03","json"]} = minino_dispatcher:match_url("/get/03/blog.json/", Rules),
+
+    {match,
+     get_page,
+     get_view,
+     ["03","xml"]} = minino_dispatcher:match_url("/get/03/blog.xml/", Rules),
+
+    {match,
+     posts_page,
+     posts_view,
+     ["03/blog.json/"]} =
+	minino_dispatcher:match_url("/post/03/blog.json/", Rules),
+
+    nomatch =minino_dispatcher:match_url("/nodefined/", Rules),
+
+    %% Build Urls
+
+    "/" = 
+    	minino_dispatcher:build_url(home_page, 
+				    [], 
+				    Rules),
+
+    "/home/" = 
+    	minino_dispatcher:build_url(home_page2, 
+				    [], 
+				    Rules),
+
+
+    "/articles/2013/" = 
+    	minino_dispatcher:build_url(articles_page, 
+				    ["2013"], 
+				    Rules),
+
+    "/articles/2013/05/" = 
+    	minino_dispatcher:build_url(article_page, 
+				    ["2013", "05"], 
+				    Rules),
+    "/get/03/blog.json/" =
+  	minino_dispatcher:build_url(get_page, 
+				    ["03", "json"], 
+				    Rules),
+
+    "/get/03/blog.xml/" =
+  	minino_dispatcher:build_url(get_page, 
+				    ["03", "xml"], 
+				    Rules),
+
+
     ok.
-
 
 get_dispatch_rules() ->
-    [%% {Id::atom(), Path::[string()|atom()], view::atom()}
-     {root_page, [], home_view},
-     {home_page, ["home"], home_view},
-     {test_page, ["test", testvalue], test_view}
+    [%% {Id::atom(), RegexUrlPath::string(), view::atom()}
+     {home_page, "^/$", home_view},
+     {home_page2, "^/home/$", home_view},
+     {test_page, "^/test/(\\w*)/$", test_view},
+     {articles_page, "^/articles/(\\d{4})/$", articles_view},
+     {article_page, "^/articles/(\\d{4})/(\\d{2})/$", article_view},
+     {get_page, "^/get/(\\d{2})/blog.(\\w{3,4})/$", get_view},
+     {posts_page, "^/post/(.*)", posts_view}
     ].
-
-check_dispatch_rules() ->
-    error_logger:info_msg("~n** dispatch rules test **"),
-    DRules = get_dispatch_rules(), 
-
-    error_logger:info_msg("Dispatch rules: ~p", [DRules]),
-    F = minino_dispatcher:create_match_fun(DRules),
-
-    %% test path
-    P0 = [],
-    check_path(P0, F, {home_view, []}),
-
-    %% test path
-    P1 = ["home"],
-    check_path(P1, F, {home_view, []}),
-
-    %% test path
-    P2 = ["test", "data"],
-    check_path(P2, F, {test_view, [{testvalue, "data"}]}),
-
-    %% test path
-    P3 = ["undefined"],
-    check_path(P3, F, undefined),
-
-    ok.
-
-check_path(Path, Fun, Expected)->
-    R =  Fun(Path),
-    case Expected of
-	{EView, EArgs} ->
-	    {EView, RArgs}  = Fun(Path),
-	    lists:foreach(
-	      fun(E) -> true = lists:member(E, EArgs) end,
-	      RArgs);
-	undefined -> R = undefined
-    end,
-    error_logger:info_msg("check path ~p Expected: ~p -> ok", [Path, Expected]).
-
-
-
-check_build_urls() ->
-    DRules = get_dispatch_rules(), 
-    F = minino_dispatcher:create_build_url_fun(DRules),
-    "/" = F(root_page, []),
-    "/home" = F(home_page, []),
-    {error, _} = F(test_page, [{"testvalue", "data"}]),
-    {error, _} = F(test_page, [{testvalue, data}]),
-    {error, _} = F(test_page, ["data"]),
-    "/test/data" = F(test_page, [{testvalue, "data"}]),
-    ok.
 
 
 get_file_md5(CompletePath)->
