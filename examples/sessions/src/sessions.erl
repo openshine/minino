@@ -18,8 +18,8 @@ init(_MConf) ->
     {ok, []}.
 
 dispatch_rules() ->
-    [%% {Id::atom(), Path::[string()|atom()], view::atom()}
-     {root_page, [], home_view}
+    [%% {Id::atom(), RegexUrlPath::string(), view::atom()}
+        {home_page, "^/$", home_view}
     ].
 
 

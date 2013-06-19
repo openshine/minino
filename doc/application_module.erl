@@ -35,14 +35,14 @@ init(_MConf) ->
 %% <p> This function returns a list of dispatch rules.</p>
 %% <p>example:<br />
 %% [<br />
-%%     {root_page, [], home_view},<br />
-%%     {home_page, ["home"], home_view},,<br />
-%%     {test_page, ["test", testvalue], test_view},,<br />
-%%     {upload_page, ["upload"], upload_view}<br />
-%%   ].</p>
+%%     {home_page, "^/$", home_view}, <br />
+%%     {home_page2, "^/home$", home_view}, <br />
+%%     {test_page, "^/test/(\\w*)$", test_view} <br />
+%%   ].</p> 
+%% Path is a regular expression of erlang module re.
 %% 
 %% @end
--spec dispatch_rules()-> {Id::atom(), Path::[string()|atom()], View::atom()}.
+-spec dispatch_rules()-> {Id::atom(), Regex::string(), View::atom()}.
 dispatch_rules() ->
     ok.
     
@@ -52,7 +52,7 @@ dispatch_rules() ->
 %% <p>Term is not a state, it can not be updated.</p>
 %%
 %% @end
--spec views(MReq::minino_req(), Args::[{Name::atom(), Value::string()}], Term::term()) -> ok.
+-spec views(MReq::minino_req(), Args::[Value::string()], Term::term()) -> ok.
 views(MReq, _Args, Term) ->
     ok.
 

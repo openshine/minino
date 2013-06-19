@@ -18,11 +18,9 @@ init(_MConf) ->
     {ok, #state{}}.
 
 dispatch_rules() ->
-    [%% {Id::atom(), Path::[string()|atom()], view::atom()}
-     {root_page, [], home_view},
-     {home_page, ["home"], home_view}
+    [%% {Id::atom(), RegexUrlPath::string(), view::atom()}
+        {home_page, "^/$", home_view}
     ].
-
 
 %% views
 home_view(MReq, _Args, _State) ->
