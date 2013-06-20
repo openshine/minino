@@ -1,4 +1,4 @@
-#Minino
+#Minino [![Build Status](https://secure.travis-ci.org/openshine/minino.png)](http://travis-ci.org/openshine/minino)
 
 * [What is Minino?](#about)
 * [Authors](#authors)
