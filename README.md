@@ -33,7 +33,7 @@ $ chmod 744 minino
 Get the source and build it.
 
 ```sh
-$ git clone git@github.com:openshine/minino.git
+$ git clone https://github.com/openshine/minino.git
 $ cd minino
 $ make
 ```
